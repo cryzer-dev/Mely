@@ -41,6 +41,14 @@ public struct GeneralSettingsView: View {
         return Calendar.current.date(from: c)
     }
 
+    private static func fullScreenHint(_ mode: FullScreenMode) -> String {
+        switch mode {
+        case .normal: "Челка и Mely видны поверх видео, игр и презентаций"
+        case .importantOnly: "Поверх видео, игр и презентаций — только запросы разрешений и вопросы Claude, остальное прячется и молчит"
+        case .doNotDisturb: "Поверх видео, игр и презентаций — ничего; запросы ждут в челке, пока не выйдешь из полноэкранного режима"
+        }
+    }
+
     private static func store(_ date: Date) -> String {
         let c = Calendar.current.dateComponents([.month, .day], from: date)
         return String(format: "%02d-%02d", c.month ?? 1, c.day ?? 1)
@@ -100,6 +108,12 @@ public struct GeneralSettingsView: View {
                     Text("Экран с вырезом").tag(IslandDisplayChoice.notch.storageValue)
                     Text("Главный экран (со строкой меню)").tag(IslandDisplayChoice.menuBar.storageValue)
                     Text("Следовать за курсором").tag(IslandDisplayChoice.followMouse.storageValue)
+                }
+                Picker(selection: $behavior.fullScreenMode) {
+                    ForEach(FullScreenMode.allCases) { Text($0.title).tag($0) }
+                } label: {
+                    Text("Полноэкранные приложения")
+                    Text(Self.fullScreenHint(behavior.fullScreenMode))
                 }
             }
 

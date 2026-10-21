@@ -25,6 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let behavior = IslandBehavior()
     private let updateState = UpdateState(currentVersion: AppInfo.version, releasesURL: UpdateController.releasesURL)
     private var updates: UpdateController?
+    private let fullScreen = FullScreenWatcher()
     private lazy var settings = SettingsWindowController(registry: registry, characters: characterSettings, behavior: behavior,
                                                          updates: updateState,
                                                          displayChanged: { [weak self] in self?.island?.relocateToChosenScreen() })
@@ -105,8 +106,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             behavior.onChange = { [weak self, weak machine] in
                 guard let self, let machine else { return }
                 self.behavior.apply(to: machine)
+                self.fullScreenChanged()
             }
         }
+        watchFullScreen(desktop: desktop)
         if behavior.launchGreeting {
             island?.greet()
             SoundEngine.shared.play(.greet)
@@ -226,6 +229,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         SoundEngine.shared.play(.drop)
         conversation.attach(urls)
         openChat(captureWindow: false)
+    }
+
+    /// Mely gives way to full-screen apps as «Полноэкранные приложения» says.
+    private func watchFullScreen(desktop: DesktopMelyController) {
+        let behavior = behavior, fullScreen = fullScreen
+        island?.fullScreenMode = { behavior.fullScreenMode }
+        island?.fullScreenTaken = { fullScreen.covers($0) }
+        desktop.yieldsTo = { behavior.fullScreenMode != .normal && fullScreen.covers($0) }
+        SoundEngine.shared.isQuiet = { [weak self] sound in
+            guard self?.island?.yieldsToFullScreen == true else { return false }
+            return !behavior.fullScreenMode.allows(isRequest: sound == .approval || sound == .question)
+        }
+        fullScreen.onChange = { [weak self] in self?.fullScreenChanged() }
+        fullScreen.start()
+    }
+
+    private func fullScreenChanged() {
+        island?.fullScreenChanged()
+        desktopMely?.fullScreenChanged()
     }
 
     @objc private func openSettings() {

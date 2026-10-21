@@ -102,6 +102,10 @@ final class IslandWindowController {
     private func wireMachine() {
         machine.onTransition = { [weak self] _, new in
             guard let self else { return }
+            if new == .compact || new == .hidden, self.shownOverFullScreen {
+                self.shownOverFullScreen = false
+                self.fullScreenChanged()
+            }
             // A peek on screen stays until its timer ends, unless the island opens.
             if self.presentation.mode == .peek, new == .compact || new == .hidden { return }
             self.peekTask?.cancel()
@@ -199,7 +203,8 @@ final class IslandWindowController {
             duration = .seconds(max(1, until.timeIntervalSinceNow))
         }
         presentation.dismissPeek = { [weak self] in self?.dismissLasting() }
-        guard machine.state != .expanded && machine.state != .listening else { return }
+        // Over a full-screen app previews stay away; a reminder comes back after it.
+        guard !yieldsToFullScreen, machine.state != .expanded && machine.state != .listening else { return }
         machine.reveal()
         presentation.peek = content
         presentation.mode = .peek
@@ -256,14 +261,61 @@ final class IslandWindowController {
     /// Opens the island and takes the keyboard, for typing in the chat. The panel does not
     /// activate the app: the window below keeps its place.
     func expandForTyping() {
-        expandForAlert()
+        showOverFullScreen()
+        open()
         panel.makeKeyAndOrderFront(nil)
     }
 
-    /// Opens the island for something that needs the user (approval, question, alert).
+    /// Opens the island for something that needs the user (a permission request, a
+    /// question). Over a full-screen app only if the setting lets requests through.
     func expandForAlert() {
+        if fullScreenMode() != .normal, fullScreenTaken(currentScreen) {
+            guard fullScreenMode().allows(isRequest: true) else { return }
+            showOverFullScreen()
+        }
+        open()
+    }
+
+    private func open() {
         machine.openedExternally()
         presentation.mode = .expanded
+    }
+
+    // MARK: - Full screen
+
+    /// Set by the app: whether a full-screen app took the screen, and the setting.
+    var fullScreenTaken: (NSScreen?) -> Bool = { _ in false }
+    var fullScreenMode: () -> FullScreenMode = { .normal }
+    /// Hidden for a full-screen app right now: invisible, and clicks go to the app.
+    private(set) var yieldsToFullScreen = false
+    /// Opened over the full-screen app (a request, the hotkey) until it folds again.
+    private var shownOverFullScreen = false
+
+    private func showOverFullScreen() {
+        shownOverFullScreen = true
+        fullScreenChanged()
+    }
+
+    /// The screens or the setting changed.
+    func fullScreenChanged() {
+        let hide = fullScreenMode() != .normal && fullScreenTaken(currentScreen) && !shownOverFullScreen
+        guard hide != yieldsToFullScreen else { return }
+        yieldsToFullScreen = hide
+        log.info("full screen: island \(hide ? "hidden" : "shown", privacy: .public)")
+        if hide {
+            panel.ignoresMouseEvents = true
+            if presentation.mode == .peek {
+                peekTask?.cancel()
+                presentation.peek = nil
+                presentation.mode = machine.state == .hidden ? .hidden : .compact
+            }
+        }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.2
+            panel.animator().alphaValue = hide ? 0 : 1
+        }
+        // A request waited out the full-screen app («Не беспокоить»).
+        if !hide, wingsPinned(), machine.state != .expanded { open() }
     }
 
     // MARK: - Screens
@@ -330,6 +382,7 @@ final class IslandWindowController {
         let size = IslandPresentation.panelSize
         panel.setFrame(NSRect(x: frame.midX - size.width / 2, y: frame.maxY - size.height,
                               width: size.width, height: size.height), display: true)
+        fullScreenChanged()
     }
 
     /// Settings → «Где показывать челку» changed.
@@ -411,7 +464,7 @@ final class IslandWindowController {
         // Without a notch the resting bar must not grab clicks meant for the window below.
         let hoverRect = !presentation.geometry.hasNotch && presentation.mode != .expanded
             ? islandRect : islandRect.insetBy(dx: -6, dy: -6)
-        let inIsland = hoverRect.contains(local)
+        let inIsland = !yieldsToFullScreen && hoverRect.contains(local)
         let carrying = isCarrying()
 
         if !carrying, panel.ignoresMouseEvents == inIsland {

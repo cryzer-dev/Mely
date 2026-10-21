@@ -51,10 +51,14 @@ final class SoundEngine {
         NSWorkspace.shared.activateFileViewerSelecting([Self.customFolder])
     }
 
-    /// Plays unless sounds are off or a Focus is on; the same sound at most every 0.25 s.
+    /// Set by the app: quiet over a full-screen app (`FullScreenMode`).
+    var isQuiet: (Sound) -> Bool = { _ in false }
+
+    /// Plays unless sounds are off, a Focus is on or a full-screen app wants quiet; the same
+    /// sound at most every 0.25 s.
     func play(_ sound: Sound, force: Bool = false) {
         let behavior = behavior
-        guard force || behavior?.soundOn ?? true, force || !SystemFocus.isOn(),
+        guard force || behavior?.soundOn ?? true, force || !SystemFocus.isOn(), force || !isQuiet(sound),
               let player = players[sound] else { return }
         let now = Date()
         if let last = lastPlayed[sound], now.timeIntervalSince(last) < 0.25 { return }

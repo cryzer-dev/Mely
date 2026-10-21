@@ -35,6 +35,10 @@ public final class IslandBehavior {
     public var collapseOnFocusLoss: Bool {
         didSet { defaults.set(collapseOnFocusLoss, forKey: Keys.collapseOnFocusLoss); onChange?() }
     }
+    /// «Полноэкранные приложения».
+    public var fullScreenMode: FullScreenMode {
+        didSet { defaults.set(fullScreenMode.rawValue, forKey: FullScreenMode.defaultsKey); onChange?() }
+    }
     /// Mely peeks out of the notch at launch.
     public var launchGreeting: Bool { didSet { defaults.set(launchGreeting, forKey: Keys.launchGreeting); onChange?() } }
     public var soundOn: Bool { didSet { defaults.set(soundOn, forKey: Keys.soundOn); onChange?() } }
@@ -47,6 +51,7 @@ public final class IslandBehavior {
         collapseAfter = defaults.object(forKey: Keys.collapseAfter) as? Double ?? 5
         hideAfter = defaults.object(forKey: Keys.hideAfter) as? Double ?? 60
         collapseOnFocusLoss = defaults.object(forKey: Keys.collapseOnFocusLoss) as? Bool ?? true
+        fullScreenMode = FullScreenMode(rawValue: defaults.string(forKey: FullScreenMode.defaultsKey) ?? "") ?? .default
         launchGreeting = defaults.object(forKey: Keys.launchGreeting) as? Bool ?? true
         soundOn = defaults.object(forKey: Keys.soundOn) as? Bool ?? true
         soundVolume = defaults.object(forKey: Keys.soundVolume) as? Double ?? 0.5

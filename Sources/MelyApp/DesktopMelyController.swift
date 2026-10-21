@@ -433,6 +433,18 @@ final class DesktopMelyController {
         return clamp(NSPoint(x: defaults.double(forKey: Self.xKey), y: defaults.double(forKey: Self.yKey)))
     }
 
+    /// Set by the app: Mely stays off a screen a full-screen app took (`FullScreenMode`).
+    var yieldsTo: (NSScreen?) -> Bool = { _ in false }
+
+    /// The full-screen screens or the setting changed.
+    func fullScreenChanged() {
+        guard let panel else { return }
+        let hide = yieldsTo(panel.screen)
+        guard hide != (panel.alphaValue == 0) else { return }
+        panel.alphaValue = hide ? 0 : 1
+        panel.ignoresMouseEvents = hide
+    }
+
     /// Hidden while the screen sleeps or is locked: nothing to draw for nobody.
     private func observeScreenSleep() {
         let workspace = NSWorkspace.shared.notificationCenter
