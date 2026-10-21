@@ -3,6 +3,9 @@ import AppKit
 import SwiftUI
 import MelyCore
 import MelyUI
+import OSLog
+
+private let log = Logger(subsystem: "dev.mely.app", category: "island")
 
 /// The transparent panel at the top of the screen that hosts the island. The panel never
 /// moves or resizes: the black shape inside animates. Mouse events pass through except
@@ -17,6 +20,8 @@ final class IslandWindowController {
     private var pollInterval: TimeInterval = 0
     private var wasInIsland = false
     private var screenObserver: NSObjectProtocol?
+    private var focusMonitors: [Any] = []
+    private var activationObserver: NSObjectProtocol?
     private var peekTask: Task<Void, Never>?
     private var currentScreen: NSScreen?
 
@@ -87,6 +92,7 @@ final class IslandWindowController {
             self.panel.resignKey()
         }
         observeScreens()
+        observeFocus()
         panel.orderFrontRegardless()
         startPolling(interval: Self.idlePoll)
     }
@@ -269,6 +275,44 @@ final class IslandWindowController {
                 self.relocate(to: Self.targetScreen(for: Self.displayChoice))
             }
         }
+    }
+
+    // MARK: - Focus
+
+    /// «Закрывать при клике мимо»: a click outside the island, or another app coming forward.
+    private func observeFocus() {
+        let clicks: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        // Clicks in other apps never reach Mely: only a global monitor sees them.
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: clicks, handler: { [weak self] _ in
+            MainActor.assumeIsolated { self?.clickedOutside() }
+        }) { focusMonitors.append(global) }
+        // Mely's own windows: Settings counts as elsewhere; the island, its menus and
+        // popovers, and Mely on the desktop (floating panels) do not.
+        if let local = NSEvent.addLocalMonitorForEvents(matching: clicks, handler: { [weak self] event in
+            MainActor.assumeIsolated {
+                if let window = event.window, window.level == .normal { self?.clickedOutside() }
+            }
+            return event
+        }) { focusMonitors.append(local) }
+        activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
+        ) { [weak self] note in
+            let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+            guard app?.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return }
+            MainActor.assumeIsolated { self?.loseFocus("app \(app?.bundleIdentifier ?? "-")") }
+        }
+    }
+
+    private func loseFocus(_ reason: String) {
+        let before = machine.state
+        machine.focusLost()
+        if machine.state != before { log.info("folded: \(reason, privacy: .public)") }
+    }
+
+    private func clickedOutside() {
+        // Carrying Mely out of the island is a drag that starts inside.
+        guard !isCarrying(), !screenFrame.contains(NSEvent.mouseLocation) else { return }
+        loseFocus("click outside")
     }
 
     /// Recomputes the resting geometry for `screen` and pins the panel to its top centre.

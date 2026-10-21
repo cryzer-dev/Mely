@@ -36,10 +36,12 @@ public final class IslandStateMachine {
     }
     /// compact → hidden delay.
     public var compactToHiddenDelay: TimeInterval = 60
-    /// Off («Не сворачивать»): the pointer leaving never folds the expanded island; «×»,
+    /// Off («Не закрывать»): the pointer leaving never folds the expanded island; «×»,
     /// or Esc do.
     public var collapsesWhenLeft = true
-    /// Off («Не прятать»): the compact island never hides by itself.
+    /// Folds the open island at once when the user works elsewhere (`focusLost()`).
+    public var collapsesOnFocusLoss = true
+    /// Off («Не убирать»): the compact island never hides by itself.
     public var hidesWhenIdle = true
     /// greeting → compact delay once the greeting animation ends (pointer away).
     public var greetAutoCollapseDelay: TimeInterval = 0.6
@@ -153,6 +155,15 @@ public final class IslandStateMachine {
     public func collapse() {
         openedByHover = false
         guard state == .expanded || state == .greeting || state == .listening else { return }
+        cancelTimers()
+        transition(to: .compact)
+    }
+
+    /// A click outside Mely or another app came forward. The listening island and one held
+    /// open by a request stay.
+    public func focusLost() {
+        guard collapsesOnFocusLoss, state == .expanded || state == .greeting, isHeldOpen?() != true else { return }
+        openedByHover = false
         cancelTimers()
         transition(to: .compact)
     }

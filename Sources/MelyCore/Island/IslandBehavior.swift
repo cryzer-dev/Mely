@@ -10,15 +10,16 @@ public final class IslandBehavior {
         public static let openOnHover = "islandOpenOnHover"
         public static let collapseAfter = "islandCollapseAfter"
         public static let hideAfter = "islandHideAfter"
+        public static let collapseOnFocusLoss = "islandCollapseOnFocusLoss"
         public static let launchGreeting = "launchGreeting"
         public static let soundOn = "soundOn"
         public static let soundVolume = "soundVolume"
     }
 
-    /// «Сворачивать раскрытую челку»: seconds after the pointer leaves; `never` keeps it
-    /// open until «×» or Esc.
+    /// «Закрывать панель»: seconds after the pointer leaves; `never` keeps it open until
+    /// «×» or Esc.
     public static let collapseChoices: [TimeInterval] = [3, 5, 15, 30, 60, never]
-    /// «Прятать свёрнутую челку»: seconds without events before only the notch is left.
+    /// «Убирать полоску выреза»: seconds without events before only the notch is left.
     public static let hideChoices: [TimeInterval] = [30, 60, 180, 300, never]
     public static let never: TimeInterval = 0
 
@@ -30,6 +31,10 @@ public final class IslandBehavior {
     public var openOnHover: Bool { didSet { defaults.set(openOnHover, forKey: Keys.openOnHover); onChange?() } }
     public var collapseAfter: TimeInterval { didSet { defaults.set(collapseAfter, forKey: Keys.collapseAfter); onChange?() } }
     public var hideAfter: TimeInterval { didSet { defaults.set(hideAfter, forKey: Keys.hideAfter); onChange?() } }
+    /// «Закрывать при клике мимо»: a click outside Mely or another app coming forward folds the panel.
+    public var collapseOnFocusLoss: Bool {
+        didSet { defaults.set(collapseOnFocusLoss, forKey: Keys.collapseOnFocusLoss); onChange?() }
+    }
     /// Mely peeks out of the notch at launch.
     public var launchGreeting: Bool { didSet { defaults.set(launchGreeting, forKey: Keys.launchGreeting); onChange?() } }
     public var soundOn: Bool { didSet { defaults.set(soundOn, forKey: Keys.soundOn); onChange?() } }
@@ -39,8 +44,9 @@ public final class IslandBehavior {
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         openOnHover = defaults.bool(forKey: Keys.openOnHover)
-        collapseAfter = defaults.object(forKey: Keys.collapseAfter) as? Double ?? 15
+        collapseAfter = defaults.object(forKey: Keys.collapseAfter) as? Double ?? 5
         hideAfter = defaults.object(forKey: Keys.hideAfter) as? Double ?? 60
+        collapseOnFocusLoss = defaults.object(forKey: Keys.collapseOnFocusLoss) as? Bool ?? true
         launchGreeting = defaults.object(forKey: Keys.launchGreeting) as? Bool ?? true
         soundOn = defaults.object(forKey: Keys.soundOn) as? Bool ?? true
         soundVolume = defaults.object(forKey: Keys.soundVolume) as? Double ?? 0.5
@@ -51,16 +57,17 @@ public final class IslandBehavior {
         machine.openOnHover = openOnHover
         machine.collapsesWhenLeft = collapseAfter != Self.never
         if collapseAfter != Self.never { machine.expandedToCompactDelay = collapseAfter }
+        machine.collapsesOnFocusLoss = collapseOnFocusLoss
         machine.hidesWhenIdle = hideAfter != Self.never
         if hideAfter != Self.never { machine.compactToHiddenDelay = hideAfter }
     }
 
     public static func title(collapse seconds: TimeInterval) -> String {
-        seconds == never ? "Не сворачивать" : "Через \(Int(seconds)) с"
+        seconds == never ? "Не закрывать" : "Через \(Int(seconds)) с"
     }
 
     public static func title(hide seconds: TimeInterval) -> String {
-        if seconds == never { return "Не прятать" }
+        if seconds == never { return "Не убирать" }
         return seconds < 60 ? "Через \(Int(seconds)) с" : "Через \(Int(seconds / 60)) мин"
     }
 }

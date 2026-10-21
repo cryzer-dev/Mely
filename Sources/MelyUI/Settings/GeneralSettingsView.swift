@@ -60,22 +60,38 @@ public struct GeneralSettingsView: View {
         @Bindable var behavior = behavior
         Form {
             Section {
-                Toggle("Открывать при наведении", isOn: $behavior.openOnHover)
-                Picker("Сворачивать раскрытую челку", selection: $behavior.collapseAfter) {
+                // «Панель» — the open island with tabs; «полоска выреза» — Mely and the status
+                // beside the notch. Each setting says under it what it does.
+                Toggle(isOn: $behavior.openOnHover) {
+                    Text("Открывать при наведении")
+                    Text("Панель открывается, когда курсор над вырезом, а не по клику")
+                }
+                Picker(selection: $behavior.collapseAfter) {
                     ForEach(IslandBehavior.collapseChoices, id: \.self) { Text(IslandBehavior.title(collapse: $0)).tag($0) }
+                } label: {
+                    Text("Закрывать панель")
+                    Text("Через сколько после ухода курсора панель сворачивается в полоску выреза")
                 }
-                Picker("Прятать свёрнутую челку", selection: $behavior.hideAfter) {
+                Toggle(isOn: $behavior.collapseOnFocusLoss) {
+                    Text("Закрывать при клике мимо")
+                    Text("Клик в другом окне или переход в другое приложение сразу сворачивает панель")
+                }
+                Picker(selection: $behavior.hideAfter) {
                     ForEach(IslandBehavior.hideChoices, id: \.self) { Text(IslandBehavior.title(hide: $0)).tag($0) }
+                } label: {
+                    Text("Убирать полоску выреза")
+                    Text("Через сколько без событий полоска прячется и остаётся только вырез")
                 }
-                Picker("Боковые части челки", selection: $wingsMode) {
+                Picker(selection: $wingsMode) {
                     ForEach(IslandWings.Mode.allCases) { Text($0.title).tag($0) }
+                } label: {
+                    Text("Полоска закрывает значки строки меню")
+                    Text("Когда полоска выреза видна поверх значков рядом с вырезом")
                 }
             } header: {
                 Text("Поведение")
             } footer: {
-                Text(behavior.collapseAfter == IslandBehavior.never
-                     ? "Раскрытая челка не сворачивается, когда уводишь курсор или переключаешься в другое окно: только «×» в шапке или Esc. Пока ждёт разрешение или вопрос, челка открыта всегда."
-                     : "Время отсчитывается, когда курсор ушёл с челки. Пока ждёт разрешение или вопрос, челка открыта всегда. Боковые части закрывают значки строки меню рядом с челкой.")
+                Text("Пока ждёт разрешение или вопрос Claude, панель открыта всегда: закрыть её можно «×» в шапке или Esc.")
                     .foregroundStyle(.secondary)
             }
 

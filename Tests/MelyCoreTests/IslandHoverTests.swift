@@ -37,7 +37,8 @@ import Foundation
     @Test func neverCollapseKeepsItOpenAfterThePointerLeaves() async throws {
         let defaults = try #require(UserDefaults(suiteName: "mely-behavior-\(UUID().uuidString)"))
         let behavior = IslandBehavior(defaults: defaults)
-        #expect(behavior.collapseAfter == 15 && behavior.hideAfter == 60 && behavior.launchGreeting)
+        #expect(behavior.collapseAfter == 5 && behavior.hideAfter == 60 && behavior.launchGreeting)
+        #expect(behavior.collapseOnFocusLoss)
         behavior.collapseAfter = IslandBehavior.never
         behavior.hideAfter = IslandBehavior.never
         let m = IslandStateMachine()
@@ -58,6 +59,41 @@ import Foundation
         behavior.collapseAfter = 3
         behavior.apply(to: m)
         #expect(m.collapsesWhenLeft && m.expandedToCompactDelay == 3)
+    }
+
+    @Test func aChosenDelayOutlivesTheNewDefault() throws {
+        let defaults = try #require(UserDefaults(suiteName: "mely-behavior-\(UUID().uuidString)"))
+        defaults.set(15.0, forKey: IslandBehavior.Keys.collapseAfter)
+        #expect(IslandBehavior(defaults: defaults).collapseAfter == 15)
+    }
+
+    @Test func clickingElsewhereFoldsThePanel() {
+        let m = IslandStateMachine()
+        m.click()
+        #expect(m.state == .expanded)
+        m.focusLost()
+        #expect(m.state == .compact)
+
+        var held = true
+        m.isHeldOpen = { held }
+        m.click()
+        m.focusLost()
+        #expect(m.state == .expanded)
+        held = false
+
+        m.voiceWoke()
+        m.focusLost()
+        #expect(m.state == .listening)
+        m.voiceFinished()
+
+        let defaults = UserDefaults(suiteName: "mely-behavior-\(UUID().uuidString)")!
+        let behavior = IslandBehavior(defaults: defaults)
+        behavior.collapseOnFocusLoss = false
+        behavior.apply(to: m)
+        m.click()
+        m.focusLost()
+        #expect(m.state == .expanded)
+        #expect(IslandBehavior(defaults: defaults).collapseOnFocusLoss == false)
     }
 
     @Test func comingBackKeepsItOpen() async throws {
