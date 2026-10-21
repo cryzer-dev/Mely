@@ -1,8 +1,11 @@
 import AppKit
+import os
 import SwiftUI
 import Observation
 import MelyCore
 import MelyUI
+
+private let log = Logger(subsystem: "dev.mely.app", category: "chat")
 
 /// Chat with Claude: through the user's Claude plan (local Claude Code, no key) or by an
 /// API key in the Keychain. Off, it holds no conversation.
@@ -149,6 +152,7 @@ private struct RoutingTransport: ChatTransport, @unchecked Sendable {
 
     func stream(apiKey: String, model: ChatModel, history: [ChatTurn]) -> AsyncThrowingStream<SSEEvent, Error> {
         let (route, cli) = MainActor.assumeIsolated { (self.route(), self.cli()) }
+        log.info("chat route=\(String(describing: route), privacy: .public) cli=\(cli != nil)")
         if route == .subscription, let cli { return cli.stream(apiKey: apiKey, model: model, history: history) }
         return api.stream(apiKey: apiKey, model: model, history: history)
     }

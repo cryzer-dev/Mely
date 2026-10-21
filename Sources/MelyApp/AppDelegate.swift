@@ -29,7 +29,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                                          updates: updateState,
                                                          displayChanged: { [weak self] in self?.island?.relocateToChosenScreen() })
 
+    func applicationWillTerminate(_ notification: Notification) {
+        DevBuildSwap.handBack()
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        guard DevBuildSwap.takeOver() else { NSApp.terminate(nil); return }
         SoundEngine.shared.behavior = behavior
         let character = characterSettings
         let model = islandModel

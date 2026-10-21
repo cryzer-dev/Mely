@@ -2,6 +2,9 @@ import Foundation
 import AVFoundation
 import Speech
 import Observation
+import os
+
+private let log = Logger(subsystem: "dev.mely.app", category: "dictation")
 
 /// Dictation into the chat field: the microphone through Speech, on the device when
 /// the language supports it. Asks for the microphone and speech recognition on first use.
@@ -39,9 +42,7 @@ public final class ChatDictation {
         if recognizer.supportsOnDeviceRecognition { request.requiresOnDeviceRecognition = true }
         self.request = request
         let input = engine.inputNode
-        input.installTap(onBus: 0, bufferSize: 1024, format: input.outputFormat(forBus: 0)) { buffer, _ in
-            request.append(buffer)
-        }
+        Self.feed(input, to: request)
         do {
             engine.prepare()
             try engine.start()
@@ -51,14 +52,12 @@ public final class ChatDictation {
             return
         }
         isRecording = true
-        task = recognizer.recognitionTask(with: request) { [weak self] result, failure in
-            let heard = result?.bestTranscription.formattedString
-            let final = result?.isFinal == true || failure != nil
-            Task { @MainActor in
-                guard let self else { return }
-                if let heard { self.text = self.prefix + heard }
-                if final { self.stopAudio() }
-            }
+        task = Self.recognize(request, with: recognizer) { [weak self] heard, final in
+            guard let self else { return }
+            // The recognizer can end with an empty transcription (stopped, cancelled):
+            // what was already heard stays.
+            if let heard, !heard.isEmpty { self.text = self.prefix + heard }
+            if final { self.stopAudio() }
         }
     }
 
@@ -69,6 +68,7 @@ public final class ChatDictation {
         // Give the recognizer a moment to settle the last words.
         try? await Task.sleep(for: .milliseconds(350))
         stopAudio()
+        log.info("finish with \(self.text.count) chars")
         return text
     }
 
@@ -82,11 +82,34 @@ public final class ChatDictation {
         isRecording = false
     }
 
-    private static func authorized() async -> Bool {
+    // Speech and AVFoundation call back on their own queues. Closures made inside this
+    // main-actor class inherit its isolation and trap there (Swift 6 checks it at run
+    // time), so they are made in nonisolated functions and hop to the main actor.
+
+    private nonisolated static func authorized() async -> Bool {
         let speech = await withCheckedContinuation { (done: CheckedContinuation<Bool, Never>) in
             SFSpeechRecognizer.requestAuthorization { done.resume(returning: $0 == .authorized) }
         }
         guard speech else { return false }
         return await AVCaptureDevice.requestAccess(for: .audio)
+    }
+
+    /// Microphone buffers go to the request on the audio thread.
+    private nonisolated static func feed(_ input: AVAudioInputNode, to request: SFSpeechAudioBufferRecognitionRequest) {
+        input.installTap(onBus: 0, bufferSize: 1024, format: input.outputFormat(forBus: 0)) { buffer, _ in
+            request.append(buffer)
+        }
+    }
+
+    /// What is heard, on the main actor: the transcription so far, and whether it ended.
+    private nonisolated static func recognize(_ request: SFSpeechAudioBufferRecognitionRequest,
+                                              with recognizer: SFSpeechRecognizer,
+                                              heard: @escaping @MainActor (String?, Bool) -> Void) -> SFSpeechRecognitionTask {
+        recognizer.recognitionTask(with: request) { result, failure in
+            let text = result?.bestTranscription.formattedString
+            let final = result?.isFinal == true || failure != nil
+            log.info("heard \(text?.count ?? -1) chars, final=\(final), error=\(failure?.localizedDescription ?? "-", privacy: .public)")
+            Task { @MainActor in heard(text, final) }
+        }
     }
 }

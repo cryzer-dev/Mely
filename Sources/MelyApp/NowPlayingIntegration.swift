@@ -78,12 +78,11 @@ final class NowPlayingIntegration: Integration {
         log.info("adapter started")
         readTask = Task.detached { [weak self] in
             var stream = NowPlayingStream()
-            do {
-                for try await line in out.fileHandleForReading.bytes.lines {
-                    guard let state = stream.apply(line: line) else { continue }
-                    await self?.receive(state)
-                }
-            } catch {}
+            // Not `bytes.lines`: its readers take turns, and this one waits for hours.
+            for await line in PipeLines.lines(out.fileHandleForReading) {
+                guard let state = stream.apply(line: line) else { continue }
+                await self?.receive(state)
+            }
             await self?.relaunchLater()
         }
     }

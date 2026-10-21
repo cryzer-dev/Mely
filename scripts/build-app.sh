@@ -1,6 +1,8 @@
 #!/bin/zsh
 # Builds build/Mely.app and signs it with the "Mely Dev" identity (scripts/make-dev-cert.sh).
-# Usage: scripts/build-app.sh [--debug] [--install] [--ad-hoc]
+# Usage: scripts/build-app.sh [--debug] [--dev] [--install] [--ad-hoc]
+#   --dev      builds "Mely Dev" (build/MelyDev.app, dev.mely.app.dev, no updates) for local
+#              testing: it installs next to the release and takes over from it while it runs
 #   --install  puts it in /Applications (the one copy: an older one in ~/Applications is removed)
 #   --ad-hoc   signs without an identity (CI checks of pull requests)
 # The version comes from version.txt (kept by release-please); the build number is
@@ -12,9 +14,11 @@ cd "$(dirname "$0")/.."
 CONFIG=release
 INSTALL=0
 ADHOC=0
+DEV=0
 for arg in "$@"; do
   case $arg in
     --debug) CONFIG=debug ;;
+    --dev) DEV=1 ;;
     --install) INSTALL=1 ;;
     --ad-hoc) ADHOC=1 ;;
   esac
@@ -37,11 +41,16 @@ swift build -c $CONFIG --product nc-hook
 BIN=$(swift build -c $CONFIG --show-bin-path)
 
 APP=build/Mely.app
+(( DEV )) && APP=build/MelyDev.app
 rm -rf $APP
 mkdir -p $APP/Contents/MacOS $APP/Contents/Helpers $APP/Contents/Resources $APP/Contents/Frameworks
 cp Resources/Info.plist $APP/Contents/Info.plist
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" -c "Set :CFBundleVersion $BUILD" \
   $APP/Contents/Info.plist
+if (( DEV )); then
+  /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier dev.mely.app.dev" -c "Set :CFBundleName Mely Dev" \
+    -c "Set :CFBundleDisplayName Mely Dev" -c "Delete :SUFeedURL" $APP/Contents/Info.plist
+fi
 cp Resources/AppIcon.icns $APP/Contents/Resources/AppIcon.icns
 cp LICENSE THIRD_PARTY_NOTICES.md $APP/Contents/Resources/
 cp $BIN/Mely $APP/Contents/MacOS/Mely
@@ -81,7 +90,15 @@ $SIGN --entitlements Resources/Mely.entitlements $APP
 codesign --verify --strict $APP
 echo "Built $APP $VERSION ($BUILD, $CONFIG)"
 
-if (( INSTALL )); then
+if (( INSTALL && DEV )); then
+  # Quitting Mely Dev starts the release again; the new Mely Dev takes over once opened.
+  pkill -f /Applications/MelyDev.app/Contents/MacOS/Mely 2>/dev/null || true
+  rm -rf /Applications/MelyDev.app
+  cp -R $APP /Applications/MelyDev.app
+  # The first Mely Dev starts with the release's settings.
+  defaults read dev.mely.app.dev >/dev/null 2>&1 || defaults export dev.mely.app - | defaults import dev.mely.app.dev -
+  echo "Installed /Applications/MelyDev.app"
+elif (( INSTALL )); then
   pkill -x Mely 2>/dev/null || true
   rm -rf /Applications/Mely.app ~/Applications/Mely.app
   cp -R $APP /Applications/Mely.app

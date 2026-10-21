@@ -1,5 +1,8 @@
 import Foundation
+import os
 import Observation
+
+private let log = Logger(subsystem: "dev.mely.app", category: "chat")
 
 /// A message as the chat shows it.
 public struct ChatMessage: Identifiable, Equatable, Sendable {
@@ -135,21 +138,28 @@ public final class ChatConversation {
         messages.append(ChatMessage(role: .assistant, text: "", state: .streaming))
         let turns = history + [question]
         let stream = transport.stream(apiKey: key, model: model(), history: turns)
+        log.info("chat send: turns=\(turns.count)")
         task = Task { [weak self] in
             var accumulator = MessageAccumulator()
+            var events = 0
             do {
                 for try await event in stream {
+                    events += 1
+                    if events == 1 { log.info("chat first event, conversation alive=\(self != nil)") }
                     accumulator.apply(event)
                     self?.updateLast {
                         $0.text = accumulator.text
                         $0.isSearching = accumulator.isSearching
                     }
                 }
+                log.info("chat stream ended: events=\(events), alive=\(self != nil), cancelled=\(Task.isCancelled)")
                 try Task.checkCancellation()
                 self?.finish(accumulator, question: question)
             } catch is CancellationError {
+                log.info("chat cancelled")
                 self?.updateLast { $0.state = .cancelled }
             } catch {
+                log.error("chat failed: \(error.localizedDescription, privacy: .public)")
                 self?.answeredAt = Date()
                 self?.updateLast { $0.state = .failed(error.localizedDescription) }
             }
@@ -157,6 +167,7 @@ public final class ChatConversation {
     }
 
     public func cancel() {
+        if task != nil { log.info("chat cancel() while streaming=\(self.isStreaming)") }
         task?.cancel()
         task = nil
         if isStreaming { updateLast { $0.state = .cancelled } }

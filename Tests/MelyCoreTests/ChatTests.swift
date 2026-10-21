@@ -368,7 +368,9 @@ private let answer: [SSEEvent] = [
         let fake = dir.appendingPathComponent("claude")
         let args = dir.appendingPathComponent("args.txt")
         let body = Self.output.map { "echo '\($0.replacingOccurrences(of: "'", with: "'\\''"))'" }.joined(separator: "\n")
-        try "#!/bin/sh\ncat > /dev/null\necho \"$@\" >> '\(args.path)'\n\(body)\n".write(to: fake, atomically: true, encoding: .utf8)
+        // One line per call: the system prompt has line breaks of its own.
+        try "#!/bin/sh\ncat > /dev/null\nprintf '%s' \"$*\" | tr '\\n' ' ' >> '\(args.path)'\necho >> '\(args.path)'\n\(body)\n"
+            .write(to: fake, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: fake.path)
 
         let transport = ClaudeCodeChatTransport(executable: fake, workdir: dir.appendingPathComponent("work"))
@@ -389,6 +391,87 @@ private let answer: [SSEEvent] = [
         for try await _ in transport.stream(apiKey: "", model: .opus, history: history) {}
         let after = try String(contentsOf: args, encoding: .utf8).split(separator: "\n")
         #expect(!after[2].contains("--resume"))
+    }
+
+    /// A stand-in `claude`: reads the question, then runs `script`.
+    static func fake(_ script: String) throws -> (URL, URL) {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("mely-cli-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let fake = dir.appendingPathComponent("claude")
+        try "#!/bin/sh\ncat > /dev/null\n\(script)\n".write(to: fake, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: fake.path)
+        return (dir, fake)
+    }
+
+    static var answer: String {
+        output.map { "echo '\($0.replacingOccurrences(of: "'", with: "'\\''"))'" }.joined(separator: "\n")
+    }
+
+    /// The chat stalled for good while the Now Playing adapter waited on its pipe.
+    @Test func answersWhileAnotherPipeIsQuiet() async throws {
+        let quiet = Process()
+        quiet.executableURL = URL(fileURLWithPath: "/bin/sleep")
+        quiet.arguments = ["30"]
+        let pipe = Pipe()
+        quiet.standardOutput = pipe
+        try quiet.run()
+        defer { quiet.terminate() }
+        // The old way of reading, which held every other `bytes` reader back.
+        let reader = Task.detached { for try await _ in pipe.fileHandleForReading.bytes.lines {} }
+        defer { reader.cancel() }
+
+        let (dir, fake) = try Self.fake(Self.answer)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let transport = ClaudeCodeChatTransport(executable: fake, workdir: dir.appendingPathComponent("work"))
+        var acc = MessageAccumulator()
+        for try await event in transport.stream(apiKey: "", model: .opus, history: [.question("Привет", attachments: [])]) {
+            acc.apply(event)
+        }
+        #expect(acc.text == "Привет!")
+    }
+
+    /// 200 KB of warnings, and the process lingers after its result with stdout open.
+    @Test func noisyStderrAndALingeringProcess() async throws {
+        let (dir, fake) = try Self.fake("head -c 204800 /dev/zero | tr '\\0' 'w' >&2\n\(Self.answer)\nsleep 30")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let transport = ClaudeCodeChatTransport(executable: fake, workdir: dir.appendingPathComponent("work"))
+        let start = Date()
+        var acc = MessageAccumulator()
+        for try await event in transport.stream(apiKey: "", model: .opus, history: [.question("Привет", attachments: [])]) {
+            acc.apply(event)
+        }
+        #expect(acc.text == "Привет!")
+        #expect(Date().timeIntervalSince(start) < 10)
+    }
+
+    @Test func silenceEndsWithAnError() async throws {
+        let (dir, fake) = try Self.fake("sleep 30")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let transport = ClaudeCodeChatTransport(executable: fake, workdir: dir.appendingPathComponent("work"))
+        transport.silenceLimit = 1
+        await #expect(throws: ClaudeCodeChatError.silent) {
+            for try await _ in transport.stream(apiKey: "", model: .opus, history: [.question("Привет", attachments: [])]) {}
+        }
+    }
+
+    @Test func failureShowsTheLastOfStderr() async throws {
+        let (dir, fake) = try Self.fake("echo 'env: node: No such file or directory' >&2\nexit 127")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let transport = ClaudeCodeChatTransport(executable: fake, workdir: dir.appendingPathComponent("work"))
+        await #expect(throws: ClaudeCodeChatError(output: "env: node: No such file or directory\n")) {
+            for try await _ in transport.stream(apiKey: "", model: .opus, history: [.question("Привет", attachments: [])]) {}
+        }
+        #expect(ClaudeCodeChatTransport.environment(for: fake)["PATH"]?.hasPrefix(dir.path + ":") == true)
+    }
+}
+
+@Suite struct PipeLinesTests {
+    @Test func splitsChunksIntoLines() {
+        let buffer = LineBuffer()
+        #expect(buffer.append(Data("a\r\nb".utf8)) == ["a"])
+        #expect(buffer.append(Data("c\n\nd".utf8)) == ["bc", ""])
+        #expect(buffer.flush() == "d")
+        #expect(buffer.flush() == nil)
     }
 }
 

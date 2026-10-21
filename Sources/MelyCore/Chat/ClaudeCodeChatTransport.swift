@@ -1,4 +1,7 @@
 import Foundation
+import os
+
+private let log = Logger(subsystem: "dev.mely.app", category: "chat")
 
 /// Answers through the user's Claude subscription: the local Claude Code CLI in print
 /// mode, no key needed. It runs `--restricted` with web search as its only tool, in Mely's
@@ -28,6 +31,9 @@ public final class ClaudeCodeChatTransport: ChatTransport, @unchecked Sendable {
         Ты помощник в приложении Mely, которое живёт в челке Mac. Отвечай на языке вопроса, \
         кратко и по делу: окно небольшое. Используй Markdown, когда он помогает: списки, код. \
         Из инструментов у тебя только веб-поиск: ищи для свежих фактов, новостей и цен.
+        Короткий вопрос без своей темы продолжает предыдущий: «а сейчас?», «а за месяц?» — про то же, \
+        о чём говорили. Mely — только место, где идёт разговор, а не его тема: не ищи и не рассказывай \
+        про Mely, пока о ней не спросили прямо.
         """
 
     /// Arguments for one question.
@@ -83,40 +89,69 @@ public final class ClaudeCodeChatTransport: ChatTransport, @unchecked Sendable {
     public func stream(apiKey: String, model: ChatModel, history: [ChatTurn]) -> AsyncThrowingStream<SSEEvent, Error> {
         let resume = history.count > 1 ? lock.withLock { sessionId } : nil
         let args = arguments(model: model, resume: resume)
-        let executable = self.executable, workdir = self.workdir
+        let executable = self.executable, workdir = self.workdir, silenceLimit = self.silenceLimit
         return AsyncThrowingStream { continuation in
             guard let question = history.last else { continuation.finish(); return }
             let process = Process()
             process.executableURL = executable
             process.arguments = args
             process.currentDirectoryURL = workdir
+            process.environment = Self.environment(for: executable)
             let stdin = Pipe(), stdout = Pipe(), stderr = Pipe()
             process.standardInput = stdin
             process.standardOutput = stdout
             process.standardError = stderr
+            // Read at once: a full stderr pipe would stop Claude Code mid-answer.
+            let errors = LineBuffer()
+            stderr.fileHandleForReading.readabilityHandler = { h in
+                let data = h.availableData
+                if data.isEmpty { h.readabilityHandler = nil } else { errors.keep(data, last: 64 * 1024) }
+            }
+            let activity = Activity()
             let task = Task { [weak self] in
+                // Silence for `silenceLimit` ends the process, and with it the lines below.
+                let watchdog = Task {
+                    while !Task.isCancelled {
+                        try? await Task.sleep(for: .seconds(1))
+                        if activity.silence > silenceLimit { activity.timedOut = true; process.terminate(); return }
+                    }
+                }
+                defer { watchdog.cancel() }
                 do {
                     try FileManager.default.createDirectory(at: workdir, withIntermediateDirectories: true)
                     try process.run()
+                    log.info("cli launched pid=\(process.processIdentifier) resume=\(resume != nil)")
                     try stdin.fileHandleForWriting.write(contentsOf: Self.inputLine(question))
                     try stdin.fileHandleForWriting.close()
                     var finished = false
-                    for try await line in stdout.fileHandleForReading.bytes.lines {
+                    var events = 0
+                    lines: for await line in PipeLines.lines(stdout.fileHandleForReading) {
+                        activity.touch()
                         switch Self.parse(line) {
-                        case .event(let event): continuation.yield(event)
+                        case .event(let event):
+                            events += 1
+                            continuation.yield(event)
                         case .session(let id): self?.remember(session: id)
-                        case .done: finished = true
+                        case .done:
+                            finished = true
+                            break lines
                         case .failed(let message): throw ClaudeCodeChatError(output: message)
                         case .other: break
                         }
                     }
-                    process.waitUntilExit()
-                    if !finished {
-                        let err = String(decoding: stderr.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-                        throw ClaudeCodeChatError(output: err.isEmpty ? "Claude Code завершился без ответа" : err)
+                    log.info("cli done: \(events) events, result=\(finished)")
+                    if finished {
+                        // The answer is complete; whatever Claude Code still does after it is not waited for.
+                        continuation.finish()
+                        Self.terminate(process, after: .seconds(2))
+                        return
                     }
-                    continuation.finish()
+                    if activity.timedOut { throw ClaudeCodeChatError.silent }
+                    try await Self.waitForExit(process)
+                    let err = errors.flush() ?? ""
+                    throw ClaudeCodeChatError(output: err.isEmpty ? "Claude Code завершился без ответа" : err)
                 } catch {
+                    log.error("cli failed: \(error.localizedDescription, privacy: .public)")
                     if process.isRunning { process.terminate() }
                     continuation.finish(throwing: error)
                 }
@@ -126,6 +161,32 @@ public final class ClaudeCodeChatTransport: ChatTransport, @unchecked Sendable {
                 if process.isRunning { process.terminate() }
             }
         }
+    }
+
+    /// How long Claude Code may print nothing before the question counts as unanswered.
+    /// Searches stream partial messages, so a minute of silence is a stuck process.
+    public var silenceLimit: TimeInterval = 60
+
+    /// A GUI app gets launchd's short PATH: an npm `claude` (`#!/usr/bin/env node`) needs
+    /// its own folder and the usual install places on it.
+    static func environment(for executable: URL) -> [String: String] {
+        var env = ProcessInfo.processInfo.environment
+        let extra = [executable.deletingLastPathComponent().path, "/opt/homebrew/bin", "/usr/local/bin"]
+        env["PATH"] = (extra + [env["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"]).joined(separator: ":")
+        return env
+    }
+
+    private static func terminate(_ process: Process, after delay: Duration) {
+        Task {
+            try? await Task.sleep(for: delay)
+            if process.isRunning { process.terminate() }
+        }
+    }
+
+    /// Without blocking a thread of the pool, as `waitUntilExit()` does.
+    private static func waitForExit(_ process: Process) async throws {
+        let deadline = Date().addingTimeInterval(5)
+        while process.isRunning, Date() < deadline { try await Task.sleep(for: .milliseconds(50)) }
     }
 
     /// Where `claude` is: a GUI app does not get the shell's PATH, so look in the usual
@@ -199,6 +260,13 @@ public final class ClaudeCodeChatTransport: ChatTransport, @unchecked Sendable {
 public struct ClaudeCodeChatError: Error, Equatable, LocalizedError {
     public let output: String
 
+    public init(output: String) {
+        self.output = output
+    }
+
+    /// Nothing printed for `silenceLimit`.
+    public static let silent = ClaudeCodeChatError(output: "Claude Code не ответил за минуту")
+
     public var errorDescription: String? {
         let t = output.lowercased()
         if t.contains("login") || t.contains("not logged") || t.contains("invalid api key") || t.contains("oauth") {
@@ -209,5 +277,19 @@ public struct ClaudeCodeChatError: Error, Equatable, LocalizedError {
         }
         let line = output.split(separator: "\n").first.map(String.init) ?? ""
         return line.isEmpty ? "Claude Code не ответил." : line
+    }
+}
+
+/// When the process last printed, and whether the watchdog gave up on it.
+private final class Activity: @unchecked Sendable {
+    private let lock = NSLock()
+    private var last = Date()
+    private var _timedOut = false
+
+    func touch() { lock.withLock { last = Date() } }
+    var silence: TimeInterval { lock.withLock { Date().timeIntervalSince(last) } }
+    var timedOut: Bool {
+        get { lock.withLock { _timedOut } }
+        set { lock.withLock { _timedOut = newValue } }
     }
 }

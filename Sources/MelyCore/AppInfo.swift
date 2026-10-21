@@ -4,7 +4,10 @@ import Foundation
 /// preferences, TCC grants or the hook socket path for existing installs.
 public enum AppInfo {
     public static let bundleId = "dev.mely.app"
+    /// Local builds (`build-app.sh --dev`): installed next to the release, never at once.
+    public static let devBundleId = "dev.mely.app.dev"
     public static let name = "Mely"
+    public static var isDevBuild: Bool { Bundle.main.bundleIdentifier == devBundleId }
     /// "0.1.0" from Info.plist; empty outside the app bundle.
     public static var version: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
