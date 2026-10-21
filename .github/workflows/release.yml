@@ -1,0 +1,92 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    name: Версия и список изменений
+    runs-on: ubuntu-latest
+    outputs:
+      created: ${{ steps.release.outputs.release_created }}
+      tag: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  build:
+    name: Сборка релиза
+    needs: release-please
+    if: needs.release-please.outputs.created == 'true'
+    runs-on: macos-26
+    env:
+      TAG: ${{ needs.release-please.outputs.tag }}
+      VERSION: ${{ needs.release-please.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.tag }}
+          fetch-depth: 0
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            .build
+            build/mediaremote
+          key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved', 'scripts/build-mediaremote.sh') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      - name: Тесты
+        run: swift test
+
+      - name: Сертификат «Mely Dev»
+        env:
+          MELY_CERT_P12: ${{ secrets.MELY_CERT_P12 }}
+          MELY_CERT_PASSWORD: ${{ secrets.MELY_CERT_PASSWORD }}
+        run: |
+          KEYCHAIN=$RUNNER_TEMP/mely.keychain-db
+          KC_PASS=$(uuidgen)
+          security create-keychain -p "$KC_PASS" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KC_PASS" "$KEYCHAIN"
+          echo "$MELY_CERT_P12" | base64 --decode > "$RUNNER_TEMP/mely.p12"
+          security import "$RUNNER_TEMP/mely.p12" -k "$KEYCHAIN" -P "$MELY_CERT_PASSWORD" -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/mely.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KC_PASS" "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          echo "MELY_KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
+
+      - name: Mely.app и установщик
+        run: |
+          scripts/build-app.sh
+          scripts/make-dmg.sh --skip-build --ci
+          test -f "build/Mely-$VERSION.dmg"
+
+      - name: Лента обновлений
+        env:
+          SPARKLE_ED_KEY: ${{ secrets.SPARKLE_ED_KEY }}
+        run: |
+          gh release view "$TAG" --json body -q .body > build/notes.md
+          gh api markdown -f text="$(cat build/notes.md)" -f mode=gfm > build/notes.html
+          scripts/make-appcast.sh "build/Mely-$VERSION.dmg" build/notes.html \
+            "https://github.com/${{ github.repository }}/releases/download/$TAG/Mely-$VERSION.dmg" \
+            "https://github.com/${{ github.repository }}/releases/tag/$TAG"
+
+      - name: Публикация
+        run: |
+          gh release upload "$TAG" "build/Mely-$VERSION.dmg" build/appcast.xml --clobber
+          gh release edit "$TAG" --draft=false --latest

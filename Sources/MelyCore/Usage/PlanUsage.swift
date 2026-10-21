@@ -1,0 +1,117 @@
+import Foundation
+import Observation
+
+/// One plan window (5 hours or 7 days) as Claude Code's statusLine reports it.
+public struct PlanWindow: Equatable, Codable, Sendable {
+    /// 0–100, above 100 once exceeded.
+    public var usedPercent: Double
+    public var resetsAt: Date?
+
+    public init(usedPercent: Double, resetsAt: Date?) {
+        self.usedPercent = usedPercent
+        self.resetsAt = resetsAt
+    }
+
+    /// `{"used_percentage": 42.5, "resets_at": 1738425600}` (Unix seconds).
+    init?(_ raw: Any?) {
+        guard let obj = raw as? [String: Any], let used = (obj["used_percentage"] as? NSNumber)?.doubleValue else { return nil }
+        usedPercent = used
+        resetsAt = Self.date(obj["resets_at"])
+    }
+
+    /// Unix seconds; milliseconds and ISO 8601 are accepted too, in case the format moves.
+    static func date(_ raw: Any?) -> Date? {
+        if let n = (raw as? NSNumber)?.doubleValue, n > 0 {
+            return Date(timeIntervalSince1970: n > 1e12 ? n / 1000 : n)
+        }
+        if let s = raw as? String {
+            return ISO8601DateFormatter().date(from: s)
+                ?? { let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]; return f.date(from: s) }()
+        }
+        return nil
+    }
+
+    public var isWarning: Bool { usedPercent >= PlanUsage.warningPercent }
+}
+
+/// Plan limits from the latest statusLine call of any session.
+public struct PlanUsage: Equatable, Codable, Sendable {
+    public static let warningPercent = 80.0
+
+    public var fiveHour: PlanWindow?
+    public var sevenDay: PlanWindow?
+    public var updatedAt: Date
+
+    public init(fiveHour: PlanWindow?, sevenDay: PlanWindow?, updatedAt: Date) {
+        self.fiveHour = fiveHour
+        self.sevenDay = sevenDay
+        self.updatedAt = updatedAt
+    }
+
+    /// Nil when the payload has no window (API key sessions: `rate_limits` is null or empty).
+    public init?(rateLimits: [String: Any], now: Date = Date()) {
+        let five = PlanWindow(rateLimits["five_hour"]), week = PlanWindow(rateLimits["seven_day"])
+        guard five != nil || week != nil else { return nil }
+        self.init(fiveHour: five, sevenDay: week, updatedAt: now)
+    }
+
+    public var isWarning: Bool { fiveHour?.isWarning == true || sevenDay?.isWarning == true }
+
+    /// The fuller window: what the compact island shows.
+    public var fullest: PlanWindow? {
+        [fiveHour, sevenDay].compactMap { $0 }.max { $0.usedPercent < $1.usedPercent }
+    }
+
+    /// A window whose reset time passed starts over at 0%.
+    public func current(now: Date = Date()) -> PlanUsage {
+        func fresh(_ w: PlanWindow?) -> PlanWindow? {
+            guard let w, let reset = w.resetsAt, reset <= now else { return w }
+            return PlanWindow(usedPercent: 0, resetsAt: nil)
+        }
+        return PlanUsage(fiveHour: fresh(fiveHour), sevenDay: fresh(sevenDay), updatedAt: updatedAt)
+    }
+
+    /// For the narrow compact island: "1ч 28м", "45м", "2д 4ч".
+    public static func shortCountdown(to date: Date, from now: Date = Date()) -> String {
+        let minutes = max(1, Int((date.timeIntervalSince(now) / 60).rounded(.up)))
+        if minutes < 60 { return "\(minutes)м" }
+        let hours = minutes / 60
+        if hours < 24 { return minutes % 60 == 0 ? "\(hours)ч" : "\(hours)ч \(minutes % 60)м" }
+        return hours % 24 == 0 ? "\(hours / 24)д" : "\(hours / 24)д \(hours % 24)ч"
+    }
+
+    /// "2 ч 14 мин", "3 дн 4 ч", "45 мин", "меньше минуты".
+    public static func countdown(to date: Date, from now: Date = Date()) -> String {
+        let minutes = Int((date.timeIntervalSince(now) / 60).rounded(.up))
+        if minutes <= 0 { return "сейчас" }
+        if minutes < 60 { return "\(minutes) мин" }
+        let hours = minutes / 60
+        if hours < 24 { return minutes % 60 == 0 ? "\(hours) ч" : "\(hours) ч \(minutes % 60) мин" }
+        return hours % 24 == 0 ? "\(hours / 24) дн" : "\(hours / 24) дн \(hours % 24) ч"
+    }
+}
+
+/// The latest plan usage, kept across launches so the overview has something to show
+/// before the first session of the day.
+@MainActor
+@Observable
+public final class PlanUsageStore {
+    public private(set) var usage: PlanUsage?
+    @ObservationIgnored private let defaults: UserDefaults
+    static let defaultsKey = "planUsage"
+
+    public init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        usage = defaults.data(forKey: Self.defaultsKey).flatMap { try? JSONDecoder().decode(PlanUsage.self, from: $0) }
+    }
+
+    /// Takes a statusLine report. Reports without windows (API key) keep the last values.
+    public func update(rateLimits: [String: Any], now: Date = Date()) {
+        guard let new = PlanUsage(rateLimits: rateLimits, now: now) else { return }
+        // statusLine runs on every redraw: write only when a window actually moved.
+        let moved = new.fiveHour != usage?.fiveHour || new.sevenDay != usage?.sevenDay
+        usage = new
+        guard moved else { return }
+        if let data = try? JSONEncoder().encode(new) { defaults.set(data, forKey: Self.defaultsKey) }
+    }
+}

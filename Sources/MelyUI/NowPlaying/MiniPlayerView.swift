@@ -1,0 +1,189 @@
+import SwiftUI
+import AppKit
+import MelyCore
+
+/// The "Музыка" tab: what plays, where, how far, with controls.
+public struct MiniPlayerView: View {
+    let model: NowPlayingModel
+    let send: (MediaCommand) -> Void
+    let openSource: (String) -> Void
+
+    public init(model: NowPlayingModel, send: @escaping (MediaCommand) -> Void, openSource: @escaping (String) -> Void) {
+        self.model = model
+        self.send = send
+        self.openSource = openSource
+    }
+
+    public var body: some View {
+        if let np = model.current {
+            HStack(alignment: .top, spacing: 16) {
+                Artwork(data: np.artwork, bundleId: np.sourceBundleId)
+                    .frame(width: Self.artwork, height: Self.artwork)
+                    .onTapGesture { openSource(np.sourceBundleId) }
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(np.title).font(.system(size: MelyType.headline, weight: .semibold)).lineLimit(2)
+                    if let artist = np.artist {
+                        Text(artist).font(.system(size: MelyType.body)).foregroundStyle(.white.opacity(MelyInk.strong)).lineLimit(1)
+                    }
+                    Button { openSource(np.sourceBundleId) } label: {
+                        HStack(spacing: 5) {
+                            AppIcon(bundleId: np.sourceBundleId).frame(width: 14, height: 14)
+                            Text(Self.appName(np.sourceBundleId)).font(.system(size: MelyType.caption)).foregroundStyle(.white.opacity(MelyInk.secondary))
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    Spacer(minLength: 0)
+                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                        Progress(position: np.position(at: context.date), duration: np.duration)
+                    }
+                    HStack(spacing: 22) {
+                        control("backward.fill", "Предыдущий", enabled: !np.prohibitsSkip) { send(.previous) }
+                        control(np.isPlaying ? "pause.fill" : "play.fill", np.isPlaying ? "Пауза" : "Воспроизвести",
+                                size: 22, enabled: true) { send(.togglePlayPause) }
+                        control("forward.fill", "Следующий", enabled: !np.prohibitsSkip) { send(.next) }
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                // As tall as the cover: the controls sit by it, not at the island's bottom.
+                .frame(height: Self.artwork)
+            }
+            .foregroundStyle(.white)
+            .frame(maxHeight: .infinity, alignment: .top)
+        } else {
+            Text("Сейчас ничего не играет").font(.system(size: MelyType.title)).foregroundStyle(.white.opacity(MelyInk.secondary))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    private func control(_ symbol: String, _ label: String, size: CGFloat = 15, enabled: Bool,
+                         action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol).font(.system(size: size)).frame(width: 34, height: 30).contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.3)
+        .accessibilityLabel(label)
+        .help(label)
+    }
+
+    static let artwork: CGFloat = 150
+
+    public static func appName(_ bundleId: String) -> String {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) else { return bundleId }
+        return FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
+    }
+}
+
+private struct Progress: View {
+    let position: TimeInterval?
+    let duration: TimeInterval?
+
+    var body: some View {
+        VStack(spacing: 3) {
+            GeometryReader { geo in
+                Capsule().fill(.white.opacity(MelyFill.selected))
+                    .overlay(alignment: .leading) {
+                        Capsule().fill(.white.opacity(MelyInk.primary))
+                            .frame(width: geo.size.width * fraction)
+                    }
+            }
+            .frame(height: 4)
+            HStack {
+                Text(Self.clock(position)).font(.system(size: MelyType.micro)).monospacedDigit()
+                Spacer()
+                Text(Self.clock(duration)).font(.system(size: MelyType.micro)).monospacedDigit()
+            }
+            .foregroundStyle(.white.opacity(MelyInk.tertiary))
+        }
+    }
+
+    private var fraction: CGFloat {
+        guard let position, let duration, duration > 0 else { return 0 }
+        return CGFloat(min(1, max(0, position / duration)))
+    }
+
+    static func clock(_ t: TimeInterval?) -> String {
+        guard let t, t.isFinite, t >= 0 else { return "–:––" }
+        let s = Int(t)
+        return s >= 3600 ? String(format: "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60) : String(format: "%d:%02d", s / 60, s % 60)
+    }
+}
+
+/// The cover, or the source app's icon when the player sends none.
+struct Artwork: View {
+    let data: Data?
+    let bundleId: String
+
+    var body: some View {
+        if let data, let image = NSImage(data: data) {
+            Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
+                .clipShape(RoundedRectangle(cornerRadius: MelyRadius.medium))
+        } else {
+            AppIcon(bundleId: bundleId).padding(18)
+                .background(.white.opacity(MelyFill.raised), in: RoundedRectangle(cornerRadius: MelyRadius.medium))
+        }
+    }
+}
+
+/// Left of the compact island: Mely always, and the cover next to it while music plays.
+public struct CompactLeading: View {
+    let music: NowPlayingModel?
+    let pose: CharacterPose
+    @Environment(\.islandCharacterSize) private var size
+    @Environment(\.characterDrag) private var drag
+
+    public init(music: NowPlayingModel?, pose: CharacterPose = .idle) {
+        self.music = music
+        self.pose = pose
+    }
+
+    public var body: some View {
+        HStack(spacing: 6) {
+            // Out on the desktop, Mely is not in the notch too.
+            MelyCharacter(pose: pose).frame(width: size, height: size)
+                .opacity(drag?.isAway == true ? 0 : 1)
+            if let np = music?.current, np.isPlaying, let data = np.artwork, let image = NSImage(data: data) {
+                Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
+                    .frame(width: size * 0.8, height: size * 0.8)
+                    .clipShape(RoundedRectangle(cornerRadius: MelyRadius.small))
+                    .accessibilityLabel("Играет: \(np.title)")
+                    .transition(.scale.combined(with: .opacity))
+            }
+        }
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: music?.current?.isPlaying)
+    }
+}
+
+/// Three bars dancing while music plays: the compact island's sign of it. Animated by
+/// Core Animation in the render server, so the app does no work per frame.
+public struct EqualizerBars: NSViewRepresentable {
+    public init() {}
+
+    public func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: NSRect(x: 0, y: 0, width: 11, height: 11))
+        view.wantsLayer = true
+        view.setAccessibilityElement(true)
+        view.setAccessibilityLabel("Играет музыка")
+        let green = CGColor(srgbRed: 0.3, green: 0.8, blue: 0.45, alpha: 1)
+        for (i, duration) in [0.42, 0.31, 0.53].enumerated() {
+            let bar = CALayer()
+            bar.backgroundColor = green
+            bar.cornerRadius = 1.25
+            bar.anchorPoint = CGPoint(x: 0.5, y: 0)
+            bar.frame = CGRect(x: CGFloat(i) * 4, y: 0, width: 2.5, height: 11)
+            let grow = CABasicAnimation(keyPath: "bounds.size.height")
+            grow.fromValue = 4
+            grow.toValue = 11
+            grow.duration = duration
+            grow.autoreverses = true
+            grow.repeatCount = .infinity
+            grow.timeOffset = Double(i) * 0.17
+            bar.add(grow, forKey: "dance")
+            view.layer?.addSublayer(bar)
+        }
+        return view
+    }
+
+    public func updateNSView(_ view: NSView, context: Context) {}
+}

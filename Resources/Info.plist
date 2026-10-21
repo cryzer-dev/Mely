@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>ru</string>
+	<key>CFBundleDisplayName</key>
+	<string>Mely</string>
+	<key>CFBundleExecutable</key>
+	<string>Mely</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>dev.mely.app</string>
+	<key>CFBundleName</key>
+	<string>Mely</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0.0</string>
+	<key>CFBundleVersion</key>
+	<string>100</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>15.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Mely читает текущую вкладку браузера и переключает приложения по вашей команде.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Mely показывает события на сегодня и сообщает о новых встречах.</string>
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>Mely забирает скриншоты с рабочего стола на бельевую верёвку, если вы это включили.</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>Mely показывает идущие и завершённые загрузки.</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Mely слушает фразу запуска голосового ассистента, когда он включён.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Mely распознаёт голосовые команды на этом Mac.</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>https://github.com/cryzer-dev/Mely/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>ad/OfZi2iV7PPrIQ+bBSSHgvzC32JRsjtNTc+5f9Cbg=</string>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
+</dict>
+</plist>

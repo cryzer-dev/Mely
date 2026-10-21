@@ -1,0 +1,25 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "simple",
+  "include-v-in-tag": true,
+  "include-component-in-tag": false,
+  "draft": true,
+  "force-tag-creation": true,
+  "pull-request-title-pattern": "chore: выпуск ${version}",
+  "pull-request-header": "Когда этот pull request окажется в `main`, GitHub соберёт Mely ${version}, приложит `.dmg` к релизу и установленные Mely предложат обновиться.",
+  "changelog-sections": [
+    { "type": "feat", "section": "Новое" },
+    { "type": "fix", "section": "Исправления" },
+    { "type": "perf", "section": "Быстрее" },
+    { "type": "revert", "section": "Отменено" },
+    { "type": "docs", "section": "Документация", "hidden": true },
+    { "type": "refactor", "section": "Переделки", "hidden": true },
+    { "type": "test", "section": "Тесты", "hidden": true },
+    { "type": "build", "section": "Сборка", "hidden": true },
+    { "type": "ci", "section": "CI", "hidden": true },
+    { "type": "chore", "section": "Прочее", "hidden": true }
+  ],
+  "packages": {
+    ".": {}
+  }
+}

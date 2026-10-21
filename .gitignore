@@ -1,0 +1,24 @@
+# Build products
+/.build
+/build
+/snapshots
+/.swiftpm
+*.xcodeproj/xcuserdata
+
+# Local tooling and planning (kept on this Mac only)
+/.idea
+/.claude
+/openspec
+/.vscode
+
+# Keys and certificates: never in the repo
+*.p12
+*.pem
+*.key
+*.cer
+*.mobileprovision
+sparkle_private_key*
+.env
+.env.*
+
+.DS_Store
