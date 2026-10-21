@@ -38,6 +38,27 @@ import Foundation
         #expect(PlanUsage(rateLimits: ["five_hour": ["used_percentage": 120]])?.fiveHour?.usedPercent == 120)
     }
 
+    /// What the compact island shows (spec plan-usage, «Лимит в свёрнутой челке»).
+    @Test func compactShowsFiveHoursOrWhatRanOut() {
+        func usage(_ five: Double?, _ week: Double?) -> PlanUsage {
+            PlanUsage(fiveHour: five.map { PlanWindow(usedPercent: $0, resetsAt: t0.addingTimeInterval(80 * 60)) },
+                      sevenDay: week.map { PlanWindow(usedPercent: $0, resetsAt: t0.addingTimeInterval(3 * 86400)) },
+                      updatedAt: t0)
+        }
+        // Ordinary use and a week near its limit: the five hours.
+        #expect(usage(30, 70).compactWindow?.kind == .fiveHour)
+        #expect(usage(20, 85).compactWindow?.window.usedPercent == 20)
+        // Five hours used up: that one, with its reset.
+        #expect(usage(100, 70).compactWindow?.kind == .fiveHour)
+        // The week used up wins over a fresh five hours.
+        #expect(usage(10, 100).compactWindow?.kind == .sevenDay)
+        // Both used up: the one that frees up later.
+        #expect(usage(100, 100).compactWindow?.kind == .sevenDay)
+        // Only the week, not used up: nothing in the compact island.
+        #expect(usage(nil, 60).compactWindow == nil)
+        #expect(usage(nil, 100).compactWindow?.kind == .sevenDay)
+    }
+
     @Test func passedResetStartsOver() throws {
         let usage = try #require(PlanUsage(rateLimits: rateLimits, now: t0))
         let later = usage.current(now: t0.addingTimeInterval(3 * 3600))

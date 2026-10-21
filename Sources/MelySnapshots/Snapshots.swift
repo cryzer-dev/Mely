@@ -55,6 +55,7 @@ enum Snapshots {
             Snapshot(name: "CalendarAgenda", view: AnyView(calendarAgenda())),
             Snapshot(name: "NowPlaying_MiniPlayer", view: AnyView(miniPlayer())),
             Snapshot(name: "Island_Compact_Music", view: AnyView(compactMusic())),
+            Snapshot(name: "Compact_PlanGauge", view: AnyView(compactPlanGauges())),
             Snapshot(name: "Character_Mely_AllPoses", view: AnyView(allPoses())),
             Snapshot(name: "Character_AllPoses", view: AnyView(speciesPoses())),
             Snapshot(name: "Character_Minimal", view: AnyView(minimalPoses())),
@@ -372,6 +373,26 @@ enum Snapshots {
                               expanded: { EmptyView() })
             .frame(height: 70, alignment: .top).clipped()
             .background(backdrop)
+    }
+
+    /// The compact limit: 30% of five hours (the week at 85% stays out), five hours used
+    /// up, the week used up.
+    @MainActor private static func compactPlanGauges() -> some View {
+        let now = Date()
+        func usage(_ five: Double, _ week: Double) -> PlanUsage {
+            PlanUsage(fiveHour: PlanWindow(usedPercent: five, resetsAt: now.addingTimeInterval(80 * 60)),
+                      sevenDay: PlanWindow(usedPercent: week, resetsAt: now.addingTimeInterval(2 * 86400 + 5 * 3600)),
+                      updatedAt: now)
+        }
+        return HStack(spacing: 24) {
+            ForEach(Array([(30.0, 85.0), (100, 70), (10, 100)].enumerated()), id: \.offset) { _, pair in
+                CompactPlanGauge(usage: usage(pair.0, pair.1))
+                    .padding(.horizontal, 7).frame(height: 22)
+                    .background(.white.opacity(0.07), in: Capsule())
+            }
+        }
+        .padding(20)
+        .background(Color.black)
     }
 
     /// Yandex Music playing, a minute into the track, with a generated cover.

@@ -57,7 +57,30 @@ public struct PlanUsage: Equatable, Codable, Sendable {
 
     public var isWarning: Bool { fiveHour?.isWarning == true || sevenDay?.isWarning == true }
 
-    /// The fuller window: what the compact island shows.
+    public enum Kind: Sendable {
+        case fiveHour, sevenDay
+
+        /// "за 5 часов", "за неделю": after «Лимит Claude».
+        public var span: String {
+            switch self {
+            case .fiveHour: "за 5 часов"
+            case .sevenDay: "за неделю"
+            }
+        }
+    }
+
+    /// What the compact island shows: a window used up, as the one that frees up later
+    /// (no work before that), else the five-hour window. The week otherwise lives in the
+    /// overview and the card.
+    public var compactWindow: (kind: Kind, window: PlanWindow)? {
+        let windows = [(Kind.fiveHour, fiveHour), (Kind.sevenDay, sevenDay)]
+            .compactMap { kind, window in window.map { (kind: kind, window: $0) } }
+        let spent = windows.filter { $0.window.usedPercent >= 100 && $0.window.resetsAt != nil }
+        if let later = spent.max(by: { $0.window.resetsAt! < $1.window.resetsAt! }) { return later }
+        return fiveHour.map { (.fiveHour, $0) }
+    }
+
+    /// The fuller window (how worried Mely looks).
     public var fullest: PlanWindow? {
         [fiveHour, sevenDay].compactMap { $0 }.max { $0.usedPercent < $1.usedPercent }
     }

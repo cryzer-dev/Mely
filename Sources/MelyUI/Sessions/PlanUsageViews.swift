@@ -60,7 +60,8 @@ public struct PlanUsageGauge: View {
     }
 }
 
-/// Compact island: the fuller window as a ring and its percent, always visible.
+/// Compact island: the five-hour window as a ring and its percent; a window used up
+/// shows when it comes back instead (`PlanUsage.compactWindow`).
 public struct CompactPlanGauge: View {
     let usage: PlanUsage?
 
@@ -71,7 +72,7 @@ public struct CompactPlanGauge: View {
     public var body: some View {
         // Refresh now and then so a passed reset drops back to 0%.
         TimelineView(.periodic(from: .now, by: 60)) { context in
-            if let w = usage?.current(now: context.date).fullest {
+            if let (kind, w) = usage?.current(now: context.date).compactWindow {
                 let color = PlanUsageStyle.color(w.usedPercent)
                 HStack(spacing: 4) {
                     ZStack {
@@ -91,14 +92,16 @@ public struct CompactPlanGauge: View {
                         .foregroundStyle(color)
                 }
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel(Self.label(w, now: context.date))
+                .accessibilityLabel(Self.label(kind, w, now: context.date))
+                .help(Self.label(kind, w, now: context.date))
             }
         }
     }
 
-    static func label(_ w: PlanWindow, now: Date) -> String {
+    static func label(_ kind: PlanUsage.Kind, _ w: PlanWindow, now: Date) -> String {
         let reset = w.resetsAt.map { ", сброс через \(PlanUsage.countdown(to: $0, from: now))" } ?? ""
-        return "Лимит Claude \(Int(w.usedPercent.rounded())) процентов\(reset)"
+        if w.usedPercent >= 100 { return "Лимит Claude \(kind.span) исчерпан\(reset)" }
+        return "Лимит Claude \(kind.span): \(Int(w.usedPercent.rounded())) процентов\(reset)"
     }
 }
 
