@@ -238,6 +238,12 @@ final class IslandWindowController {
     /// Folds the island (Mely settled on the desktop).
     func collapse() { machine.collapse() }
 
+    /// The island's screen and the bottom edge of the island as it is now.
+    var restingArea: (screen: NSScreen, bottom: CGFloat)? {
+        guard let screen = panel.screen ?? currentScreen else { return nil }
+        return (screen, screenFrame.minY)
+    }
+
     /// «×» in the header: folds and gives the keyboard back.
     func collapseFromHeader() {
         machine.collapse()

@@ -229,6 +229,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openSettings() {
+        settings.foldIsland = { [weak self] in self?.island?.collapseFromHeader() }
+        settings.islandArea = { [weak self] in self?.island?.restingArea }
         settings.show()
     }
 }

@@ -13,6 +13,10 @@ final class SettingsWindowController {
     private let behavior: IslandBehavior
     private let updates: UpdateState
     private let displayChanged: () -> Void
+    /// The island: folded before the window shows, and the window kept below it (its screen
+    /// and the lowest edge the window's top may reach).
+    var foldIsland: () -> Void = {}
+    var islandArea: () -> (screen: NSScreen, bottom: CGFloat)? = { nil }
 
     init(registry: IntegrationRegistry, characters: CharacterSettings, behavior: IslandBehavior, updates: UpdateState,
          displayChanged: @escaping () -> Void) {
@@ -38,8 +42,21 @@ final class SettingsWindowController {
             window.center()
             self.window = window
         }
+        foldIsland()
         NSApp.activate()
+        if let window { keepBelowIsland(window) }
         window?.makeKeyAndOrderFront(nil)
+    }
+
+    /// A window under the island (opened there, or dragged up earlier) moves down below it.
+    private func keepBelowIsland(_ window: NSWindow) {
+        guard let (screen, bottom) = islandArea(),
+              screen.frame.intersects(window.frame) || window.screen == nil else { return }
+        let top = min(bottom, screen.visibleFrame.maxY) - 8
+        var frame = window.frame
+        guard frame.maxY > top else { return }
+        frame.origin.y = max(screen.visibleFrame.minY, top - frame.height)
+        window.setFrame(frame, display: false)
     }
 }
 
