@@ -32,6 +32,7 @@ public struct AgendaView: View {
                         .padding(.horizontal, 14).padding(.vertical, 6)
                         .background(.white, in: Capsule())
                 }
+                .islandPart()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let agenda {
                 if agenda.isEmpty {
@@ -52,10 +53,12 @@ public struct AgendaView: View {
                                 EventRow(event: event, now: context.date, join: { join(event) })
                             }
                         }
+                        .islandPart()
                     }
                 }
             } else {
                 Text("Нет доступа к календарям").font(.system(size: MelyType.title)).foregroundStyle(.white.opacity(MelyInk.secondary))
+                    .islandPart()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
@@ -70,6 +73,7 @@ public struct AgendaView: View {
                     .font(.system(size: MelyType.footnote)).foregroundStyle(.white.opacity(MelyInk.tertiary)).lineLimit(1)
             }
         }
+        .islandPart()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

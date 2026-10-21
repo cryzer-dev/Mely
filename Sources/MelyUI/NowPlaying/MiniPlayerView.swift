@@ -17,8 +17,12 @@ public struct MiniPlayerView: View {
     public var body: some View {
         if let np = model.current {
             HStack(alignment: .top, spacing: 16) {
+                // Clipped by its frame: a 16:9 video cover fills the square instead of
+                // spilling over Mely and the title.
                 Artwork(data: np.artwork, bundleId: np.sourceBundleId)
                     .frame(width: Self.artwork, height: Self.artwork)
+                    .clipShape(RoundedRectangle(cornerRadius: MelyRadius.medium))
+                    .contentShape(Rectangle())
                     .onTapGesture { openSource(np.sourceBundleId) }
                 VStack(alignment: .leading, spacing: 6) {
                     Text(np.title).font(.system(size: MelyType.headline, weight: .semibold)).lineLimit(2)
@@ -45,12 +49,15 @@ public struct MiniPlayerView: View {
                     .frame(maxWidth: .infinity)
                 }
                 // As tall as the cover: the controls sit by it, not at the island's bottom.
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .frame(height: Self.artwork)
             }
+            .islandPart()
             .foregroundStyle(.white)
             .frame(maxHeight: .infinity, alignment: .top)
         } else {
             Text("Сейчас ничего не играет").font(.system(size: MelyType.title)).foregroundStyle(.white.opacity(MelyInk.secondary))
+                .islandPart()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
@@ -81,6 +88,7 @@ private struct Progress: View {
 
     var body: some View {
         VStack(spacing: 3) {
+            // A live stream has no length: no bar to fill, the same height kept.
             GeometryReader { geo in
                 Capsule().fill(.white.opacity(MelyFill.selected))
                     .overlay(alignment: .leading) {
@@ -89,6 +97,7 @@ private struct Progress: View {
                     }
             }
             .frame(height: 4)
+            .opacity(hasLength ? 1 : 0)
             HStack {
                 Text(Self.clock(position)).font(.system(size: MelyType.micro)).monospacedDigit()
                 Spacer()
@@ -97,6 +106,8 @@ private struct Progress: View {
             .foregroundStyle(.white.opacity(MelyInk.tertiary))
         }
     }
+
+    private var hasLength: Bool { (duration ?? 0) > 0 }
 
     private var fraction: CGFloat {
         guard let position, let duration, duration > 0 else { return 0 }
@@ -117,8 +128,8 @@ struct Artwork: View {
 
     var body: some View {
         if let data, let image = NSImage(data: data) {
+            // Fills whatever frame it gets; the owner clips it to that frame.
             Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
-                .clipShape(RoundedRectangle(cornerRadius: MelyRadius.medium))
         } else {
             AppIcon(bundleId: bundleId).padding(18)
                 .background(.white.opacity(MelyFill.raised), in: RoundedRectangle(cornerRadius: MelyRadius.medium))

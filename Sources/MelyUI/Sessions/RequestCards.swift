@@ -266,6 +266,8 @@ public struct ClaudeOverview: View {
     let open: (ClaudeSession) -> Void
     let decide: (PendingRequest, HookDecision) -> Void
     let answerInTerminal: (PendingRequest) -> Void
+    /// What each page measured itself at (`islandPart`).
+    @State private var heights: [IslandTabs.Tab: CGFloat] = [:]
 
     public init(store: SessionStore, queue: ApprovalQueue, usage: PlanUsageStore? = nil,
                 tabs: IslandTabs? = nil, chat: AnyView? = nil, messages: AnyView? = nil, messagesBadge: Int = 0,
@@ -294,6 +296,7 @@ public struct ClaudeOverview: View {
                             decide: { decide(request, $0) }, answerInTerminal: { answerInTerminal(request) })
                     .transition(.opacity)
             } else if let tabs {
+                let tab = tabs.selected
                 // The sections are chosen in the header, level with the notch (task 7.9).
                 Group {
                     if tabs.selected == .chat, let chat {
@@ -309,6 +312,11 @@ public struct ClaudeOverview: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                // Each page measures itself: the leaving one keeps its own number.
+                .onPreferenceChange(IslandPartHeightKey.self) { height in
+                    MainActor.assumeIsolated { heights[tab] = height }
+                }
+                .transformPreference(IslandPartHeightKey.self) { $0 = 0 }
                 // A new section slides in a little as it fades (task 7.3).
                 .id(tabs.selected)
                 .transition(.asymmetric(insertion: .opacity.combined(with: .offset(y: 6)), removal: .opacity))
@@ -319,6 +327,15 @@ public struct ClaudeOverview: View {
         }
         .animation(.easeOut(duration: 0.18), value: queue.current?.id)
         .animation(MelyMotion.tab, value: tabs?.selected)
+        .preference(key: IslandContentHeightKey.self, value: pageHeight)
+    }
+
+    /// The chat and a request get `IslandPresentation.fullPage`; the other pages what they
+    /// measured (the sessions: room for three or four, `SessionsOverview.listHeight`).
+    private var pageHeight: CGFloat? {
+        guard queue.current == nil, let tabs else { return IslandPresentation.fullPage }
+        if tabs.selected == .chat, chat != nil { return IslandPresentation.fullPage }
+        return heights[tabs.selected]
     }
 }
 

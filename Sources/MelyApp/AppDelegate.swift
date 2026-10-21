@@ -284,8 +284,8 @@ private struct ExpandedIsland: View {
             LivePose(sessions: sessions, nowPlaying: nowPlaying) { pose in
                 ChatAwarePose(conversation: tabs.selected == .chat ? chat.conversation : nil, fallback: pose)
             }
-            .frame(width: 72)
-            .padding(.top, 18)
+            .frame(width: 88)
+            .padding(.top, 14)
             content
         }
     }

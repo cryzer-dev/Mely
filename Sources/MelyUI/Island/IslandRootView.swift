@@ -87,6 +87,9 @@ public struct IslandRootView<Compact: View, Expanded: View, Header: View>: View 
                             .padding(.top, 8)
                             .padding([.horizontal, .bottom], 20)
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                            .onPreferenceChange(IslandContentHeightKey.self) { height in
+                                MainActor.assumeIsolated { presentation.contentHeight = height }
+                            }
                     }
                     .frame(width: size.width, height: size.height, alignment: .top)
                     .transition(.islandContent)
@@ -94,6 +97,7 @@ public struct IslandRootView<Compact: View, Expanded: View, Header: View>: View 
             }
             // Reduce Motion: the shape changes with a short fade, no spring.
             .animation(reduceMotion ? .easeOut(duration: 0.15) : MelyMotion.island, value: presentation.mode)
+            .animation(reduceMotion ? .easeOut(duration: 0.15) : MelyMotion.island, value: presentation.contentHeight)
             .onDrop(of: [.fileURL], isTargeted: Binding(get: { presentation.isDropTargeted },
                                                         set: { presentation.isDropTargeted = $0 })) { providers in
                 guard let take = presentation.dropFiles else { return false }

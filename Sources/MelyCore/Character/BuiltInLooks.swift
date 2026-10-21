@@ -2,10 +2,23 @@ import Foundation
 
 /// The looks Mely ships with: its own characters drawn in code, and the plain icons.
 public enum BuiltInLooks {
+    /// Mely by default: the cream bun of the logo.
+    public static let cream = "#FFF6EE"
+    /// The Japanese white peach (hakuto): cream with a pink blush on top.
+    public static let whitePeach = "#FFE8EA"
+    /// The orange peach: golden below, rosy above.
+    public static let peach = "#FFB98C"
+    public static let yellowPeach = "#FFCF5C"
+    /// Smooth and glossy, deep red over yellow.
+    public static let nectarine = "#E8475A"
+    /// The blood peach: dark red all over.
+    public static let bloodPeach = "#B3364D"
+
     public static let mely = CharacterLook(
-        id: "mely", title: "Росток", kind: .canvas,
+        id: "mely", title: "Персик", kind: .canvas,
         customizations: [
-            bodyColor(["#FFF6EE", "#FFD6DE", "#D4F2E2", "#E3DAFF", "#FFE2C4", "#D6ECFF"]),
+            bodyColor([cream, whitePeach, peach, yellowPeach, nectarine, bloodPeach]),
+            CustomizationOption(id: "crease", title: "Бороздка", kind: .toggle, defaultValue: .bool(false)),
             CustomizationOption(id: "leaf", title: "Листик", kind: .toggle, defaultValue: .bool(true)),
             CustomizationOption(id: "cheeks", title: "Румянец", kind: .toggle, defaultValue: .bool(true)),
         ],

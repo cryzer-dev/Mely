@@ -91,9 +91,9 @@ enum SpeciesCatalog {
     }
 }
 
-// MARK: - Росток
+// MARK: - Персик
 
-/// Mely itself: the soft bun with a leaf from the logo.
+/// Mely itself: the soft round peach with a leaf from the logo.
 struct Bun: Species {
     func drawBack(_ c: BodyContext) {
         guard c.paint.flag("leaf"), !c.wearsHat else { return }
@@ -108,13 +108,58 @@ struct Bun: Species {
         }
     }
 
+    /// A peach variety: the colour below, where the sun was, the crease, and a shine for
+    /// the smooth-skinned nectarine.
+    private struct Variety {
+        let below: String, sunny: String, crease: String
+        var glossy = false
+    }
+
+    private static let varieties: [String: Variety] = [
+        BuiltInLooks.whitePeach: Variety(below: "#FFFBF5", sunny: "#FFC2C9", crease: "#F08A98"),
+        BuiltInLooks.peach: Variety(below: "#FFD58A", sunny: "#FF8F7E", crease: "#E2605F"),
+        BuiltInLooks.yellowPeach: Variety(below: "#FFE48A", sunny: "#FFA347", crease: "#D9772B"),
+        BuiltInLooks.nectarine: Variety(below: "#FFC95A", sunny: "#D92E4A", crease: "#8F1F33", glossy: true),
+        BuiltInLooks.bloodPeach: Variety(below: "#D9566B", sunny: "#7E1D36", crease: "#4E0F22"),
+    ]
+
     func drawBody(_ c: BodyContext) {
-        let base = c.paint.color(default: "#FFF6EE")
-        // The cream default keeps the logo's exact gradient.
-        if c.paint.tint == nil, c.paint.values["color"]?.color ?? "#FFF6EE" == "#FFF6EE" {
-            c.pen.fill(MelyLogo.body(in: c.r), gradient: [.hex("#FFFAF2"), .hex("#FFE6D6")], from: c.p(0.5, 0.2), to: c.p(0.5, 1))
+        let chosen = c.paint.values["color"]?.color ?? BuiltInLooks.cream
+        let body = MelyLogo.body(in: c.r)
+        if c.paint.tint == nil, chosen == BuiltInLooks.cream {
+            // The logo's exact gradient.
+            c.pen.fill(body, gradient: [.hex("#FFFAF2"), .hex("#FFE6D6")], from: c.p(0.5, 0.2), to: c.p(0.5, 1))
+            drawCrease(c, body, "#E8B49E")
+        } else if c.paint.tint == nil, let variety = Self.varieties[chosen] {
+            drawPeach(c, body, variety)
         } else {
-            c.fillBody(MelyLogo.body(in: c.r), base)
+            c.fillBody(body, c.paint.color(default: BuiltInLooks.cream))
+        }
+    }
+
+    /// Pale below, rosy where the sun was, and the crease running down one side.
+    private func drawPeach(_ c: BodyContext, _ body: Path, _ v: Variety) {
+        c.pen.fill(body, gradient: [.hex(v.below), .hex(v.sunny)], from: c.p(0.25, 0.95), to: c.p(0.8, 0.3))
+        drawCrease(c, body, v.crease)
+        if v.glossy {
+            c.pen.saving {
+                c.pen.cg.addPath(body.cgPath)
+                c.pen.cg.clip()
+                c.pen.fill(Path(ellipseIn: c.box(0.24, 0.32, 0.2, 0.09)), CGColor.white.copy(alpha: 0.35)!)
+            }
+        }
+    }
+
+    /// The crease running down one side, when switched on.
+    private func drawCrease(_ c: BodyContext, _ body: Path, _ color: String) {
+        guard c.paint.values["crease"]?.bool == true else { return }
+        c.pen.saving {
+            c.pen.cg.addPath(body.cgPath)
+            c.pen.cg.clip()
+            var crease = Path()
+            crease.move(to: c.p(0.55, 0.27))
+            crease.addQuadCurve(to: c.p(0.8, 0.62), control: c.p(0.74, 0.36))
+            c.pen.stroke(crease, CGColor.hex(color).copy(alpha: 0.35)!, width: c.r.width * 0.022)
         }
     }
 }

@@ -158,6 +158,7 @@ public struct SessionsOverview: View {
             if store.sessions.isEmpty {
                 Text("Нет активных сессий").font(.system(size: MelyType.title)).foregroundStyle(.white.opacity(MelyInk.secondary))
                     .frame(maxWidth: .infinity, alignment: .center).padding(.vertical, 20)
+                    .islandPart()
             } else {
                 ScrollView {
                     VStack(spacing: 6) {
@@ -165,6 +166,10 @@ public struct SessionsOverview: View {
                             SessionRow(session: session) { open(session) }
                         }
                     }
+                    .background(GeometryReader { geo in
+                        Color.clear.preference(key: IslandPartHeightKey.self,
+                                               value: Self.listHeight(rows: geo.size.height, count: store.sessions.count))
+                    })
                 }
             }
             // The header only has room for a ring: here, which limit, how much and when.
@@ -177,8 +182,23 @@ public struct SessionsOverview: View {
                 }
                 .padding(.horizontal, 10).padding(.vertical, 7)
                 .background(.white.opacity(MelyFill.card), in: RoundedRectangle(cornerRadius: MelyRadius.medium))
+                // The stack's spacing twice: before the spacer and after it.
+                .islandPart(spacing: 16)
             }
         }
+    }
+}
+
+extension SessionsOverview {
+    /// The list's room in the open island: three rows for up to three sessions (the island
+    /// does not jump with each one), four for four, and past that four and a sliver of the
+    /// fifth, so it shows the rest scrolls.
+    static func listHeight(rows height: CGFloat, count: Int) -> CGFloat {
+        guard count > 0 else { return height }
+        let spacing: CGFloat = 6
+        let row = (height + spacing) / CGFloat(count)
+        let shown: CGFloat = count <= 3 ? 3 : count == 4 ? 4 : 4.4
+        return row * shown - spacing
     }
 }
 

@@ -14,8 +14,8 @@ func render(_ snapshot: Snapshot, into dir: URL) throws {
     window.contentView = hosting
     window.layoutIfNeeded()
     hosting.layoutSubtreeIfNeeded()
-    // Let SwiftUI finish its first pass.
-    RunLoop.main.run(until: Date().addingTimeInterval(0.15))
+    // Let SwiftUI finish its first pass, and the open island settle at its page's height.
+    RunLoop.main.run(until: Date().addingTimeInterval(0.8))
     guard let rep = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) else {
         throw NSError(domain: "snapshots", code: 1, userInfo: [NSLocalizedDescriptionKey: "render failed: \(snapshot.name)"])
     }

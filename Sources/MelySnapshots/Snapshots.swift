@@ -50,10 +50,14 @@ enum Snapshots {
                     .frame(width: 560, height: 520))),
             Snapshot(name: "SettingsChange_Install", view: AnyView(settingsChange())),
             Snapshot(name: "Sessions_Overview", view: AnyView(sessionsOverview())),
+            Snapshot(name: "Sessions_One", view: AnyView(sessionsList(1))),
+            Snapshot(name: "Sessions_Four", view: AnyView(sessionsList(4))),
+            Snapshot(name: "Sessions_Seven", view: AnyView(sessionsList(7))),
             Snapshot(name: "Peek_Finished", view: AnyView(peek())),
             Snapshot(name: "MessagePreview", view: AnyView(messagePreview())),
             Snapshot(name: "CalendarAgenda", view: AnyView(calendarAgenda())),
             Snapshot(name: "NowPlaying_MiniPlayer", view: AnyView(miniPlayer())),
+            Snapshot(name: "NowPlaying_Video", view: AnyView(miniPlayerVideo())),
             Snapshot(name: "Island_Compact_Music", view: AnyView(compactMusic())),
             Snapshot(name: "Compact_PlanGauge", view: AnyView(compactPlanGauges())),
             Snapshot(name: "Character_Mely_AllPoses", view: AnyView(allPoses())),
@@ -396,6 +400,27 @@ enum Snapshots {
     }
 
     /// Yandex Music playing, a minute into the track, with a generated cover.
+    /// A browser video: a 16:9 cover, a long title, no artist, a live stream without duration.
+    @MainActor private static func miniPlayerVideo() -> some View {
+        let model = NowPlayingModel()
+        let cover = NSImage(size: NSSize(width: 480, height: 270), flipped: false) { rect in
+            NSGradient(colors: [.systemTeal, .systemIndigo])?.draw(in: rect, angle: 0)
+            return true
+        }
+        let png = cover.tiffRepresentation.flatMap { NSBitmapImageRep(data: $0)?.representation(using: .png, properties: [:]) }
+        model.update(NowPlaying(bundleId: "com.google.Chrome", parentBundleId: nil,
+                                title: "Как устроены часы: полный разбор механизма за 40 минут — от анкера до турбийона",
+                                artist: nil, album: nil, duration: nil, elapsed: 600, timestamp: Date(),
+                                isPlaying: true, rate: 1, artwork: png, prohibitsSkip: true))
+        let tabs = IslandTabs()
+        tabs.selected = .music
+        return expandedApp(.music, pose: .dancing) {
+            ClaudeOverview(store: SessionStore(), queue: ApprovalQueue(), tabs: tabs,
+                           music: AnyView(MiniPlayerView(model: model, send: { _ in }, openSource: { _ in })),
+                           open: { _ in }, decide: { _, _ in }, answerInTerminal: { _ in })
+        }
+    }
+
     @MainActor private static func miniPlayer() -> some View {
         let model = NowPlayingModel()
         let cover = NSImage(size: NSSize(width: 200, height: 200), flipped: false) { rect in
@@ -691,12 +716,32 @@ enum Snapshots {
                               expanded: {
                                   // As the app lays it out: the big Mely left, a little Mely per session.
                                   HStack(alignment: .top, spacing: 12) {
-                                      MelyStage(pose: .worried).frame(width: 72).padding(.top, 6)
-                                      SessionsOverview(store: store, showsHeader: false) { _ in }
+                                      MelyStage(pose: .worried).frame(width: 88).padding(.top, 2)
+                                      // Through the overview, as the app does: the island fits the page.
+                                      ClaudeOverview(store: store, queue: ApprovalQueue(), tabs: IslandTabs(),
+                                                     open: { _ in }, decide: { _, _ in }, answerInTerminal: { _ in })
                                   }
                               },
                               header: { Self.header(selected: .sessions) })
             .background(backdrop)
+    }
+
+    /// The sessions page with `count` working sessions: how tall the island gets.
+    @MainActor private static func sessionsList(_ count: Int) -> some View {
+        let store = SessionStore()
+        let names = ["shop", "admin", "api", "docs", "mobile", "billing", "infra"]
+        for name in names.prefix(count) {
+            store.apply(.toolStarted(tool: "Edit", input: JSONObject(["file_path": "/w/\(name)/index.ts"])),
+                        origin: HookOrigin(["session_id": name, "cwd": "/w/\(name)", "host_bundle_id": "com.jetbrains.WebStorm"]))
+        }
+        let defaults = UserDefaults(suiteName: "mely-snapshots-sessions")!
+        defaults.removePersistentDomain(forName: "mely-snapshots-sessions")
+        let usage = PlanUsageStore(defaults: defaults)
+        usage.update(rateLimits: ["five_hour": ["used_percentage": 56, "resets_at": Date().timeIntervalSince1970 + 7200]])
+        return expandedApp(.sessions, pose: .working) {
+            ClaudeOverview(store: store, queue: ApprovalQueue(), usage: usage, tabs: IslandTabs(),
+                           open: { _ in }, decide: { _, _ in }, answerInTerminal: { _ in })
+        }
     }
 
     /// The expanded island as the app lays it out: the header level with the notch, the big
@@ -711,7 +756,7 @@ enum Snapshots {
         return IslandRootView(presentation: p, compactLeading: { EmptyView() }, compactTrailing: AnyView(EmptyView()),
                               expanded: {
                                   HStack(alignment: .top, spacing: 12) {
-                                      MelyStage(pose: pose).frame(width: 72).padding(.top, 6)
+                                      MelyStage(pose: pose).frame(width: 88).padding(.top, 2)
                                       body
                                   }
                               },

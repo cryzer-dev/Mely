@@ -59,15 +59,16 @@ import Foundation
     @Test func customizationIsKeptPerLookAndResets() {
         let (settings, defaults) = fresh()
         #expect(settings.look.id == "mely")
-        settings.set("color", to: .color("#FFD6DE"), for: "mely")
+        settings.set("color", to: .color(BuiltInLooks.nectarine), for: "mely")
         settings.set("tail", to: .bool(false), for: "fox")
-        #expect(settings.values(for: BuiltInLooks.mely)["color"] == .color("#FFD6DE"))
+        #expect(settings.values(for: BuiltInLooks.mely)["color"] == .color(BuiltInLooks.nectarine))
         #expect(settings.values(for: BuiltInLooks.mely)["leaf"] == .bool(true))
         // Survives a relaunch.
         let again = CharacterSettings(defaults: defaults)
         #expect(again.values(for: BuiltInLooks.fox)["tail"] == .bool(false))
         again.reset("mely")
-        #expect(again.values(for: BuiltInLooks.mely)["color"] == .color("#FFF6EE"))
+        #expect(again.values(for: BuiltInLooks.mely)["color"] == .color(BuiltInLooks.cream))
+        #expect(again.values(for: BuiltInLooks.mely)["crease"] == .bool(false))
         #expect(again.values(for: BuiltInLooks.fox)["tail"] == .bool(false))
     }
 

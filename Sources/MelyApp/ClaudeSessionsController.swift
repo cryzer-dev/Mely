@@ -60,7 +60,11 @@ final class ClaudeSessionsController {
             island.remove(id: "session-\(origin.sessionId)")
             return
         }
-        if let process = session.origin.process { watcher.watch(session.id, process: process) }
+        if let process = session.origin.process {
+            watcher.watch(session.id, process: process)
+        } else {
+            log.info("session=\(session.id.prefix(8), privacy: .public) has no process")
+        }
         let itemId = "session-\(session.id)"
         switch session.state {
         case .thinking, .working:

@@ -21,7 +21,15 @@ public final class IslandPresentation {
     /// The «×» of a lasting preview (a meeting reminder).
     @ObservationIgnored public var dismissPeek: (() -> Void)?
 
-    public static let expandedSize = CGSize(width: 720, height: 300)
+    /// The open island at its largest (four sessions and the limits); shorter pages make it
+    /// shorter (`contentHeight`).
+    public static let expandedSize = CGSize(width: 640, height: 340)
+    /// The chat and the request cards: the page of the island as it was, 300 pt in all.
+    public static let fullPage: CGFloat = 240
+    /// What the open page needs below the header (`IslandContentHeightKey`); nil: all of it.
+    public var contentHeight: CGFloat?
+    /// Never shorter than the big Mely on the left.
+    public static let minContentHeight: CGFloat = 120
     /// Width added on each side of the notch in compact mode (character left, status right).
     public static let compactSideWidth: CGFloat = 84
     /// Concave ears that blend the island into the menu bar.
@@ -42,10 +50,17 @@ public final class IslandPresentation {
         case .peek:
             return CGSize(width: Self.peekWidth, height: geometry.height + Self.peekBodyHeight)
         case .expanded:
-            return Self.expandedSize
+            return CGSize(width: Self.expandedSize.width, height: expandedHeight)
         case .greeting:
             return CGSize(width: Self.greetingWidth, height: geometry.height + 104)
         }
+    }
+
+    /// Header level with the notch, the page, and the paddings around it.
+    var expandedHeight: CGFloat {
+        guard let contentHeight else { return Self.expandedSize.height }
+        let header = max(28, geometry.height)
+        return min(Self.expandedSize.height, header + 8 + max(Self.minContentHeight, contentHeight) + 20)
     }
 
     public static let peekWidth: CGFloat = 460

@@ -101,6 +101,13 @@ import Foundation
         #expect(ProcessIdentity.claude(among: []) == nil)
     }
 
+    /// A WebStorm tab closed: its Claude Code stays half-exited (`?Es`, `P_WEXIT`), never reaped.
+    @Test func halfExitedIsGone() {
+        #expect(ProcessIdentity.isEnding(stat: 2, flags: 0x6006))
+        #expect(!ProcessIdentity.isEnding(stat: 2, flags: 0x4006))
+        #expect(ProcessIdentity.isEnding(stat: 5, flags: 0))
+    }
+
     @Test func aliveDeadAndReusedPids() throws {
         let me = try #require(ProcessIdentity.running(ProcessInfo.processInfo.processIdentifier)?.identity)
         #expect(me.isAlive())

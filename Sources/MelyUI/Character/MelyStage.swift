@@ -8,7 +8,7 @@ public struct MelyStage: View {
     let size: CGFloat
     @Environment(\.characterDrag) private var drag
 
-    public init(pose: CharacterPose, size: CGFloat = 58) {
+    public init(pose: CharacterPose, size: CGFloat = 70) {
         self.pose = pose
         self.size = size
     }

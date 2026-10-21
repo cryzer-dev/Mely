@@ -22,6 +22,7 @@ public struct MessagesView: View {
                     Text("Здесь появятся уведомления выбранных приложений")
                         .font(.system(size: MelyType.caption)).foregroundStyle(.white.opacity(MelyInk.tertiary))
                 }
+                .islandPart()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 VStack(alignment: .trailing, spacing: 6) {
@@ -33,11 +34,13 @@ public struct MessagesView: View {
                                     .help("Открыть чат в \(item.appName)")
                             }
                         }
+                        .islandPart()
                     }
                     Button("Очистить", action: messages.clear)
                         .buttonStyle(.plain)
                         .font(.system(size: MelyType.caption, weight: .medium))
                         .foregroundStyle(.white.opacity(MelyInk.secondary))
+                        .islandPart(spacing: 6)
                 }
             }
         }

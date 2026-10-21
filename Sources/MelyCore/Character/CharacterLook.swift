@@ -58,7 +58,7 @@ public enum CustomizationValue: Codable, Equatable, Sendable {
 /// MelyUI behind the look's `id`.
 public struct CharacterLook: Identifiable, Equatable, Sendable {
     public let id: String
-    /// What it is ("Росток", "Лисёнок"); the character is always called Mely.
+    /// What it is ("Персик", "Лисёнок"); the character is always called Mely.
     public let title: String
     public let kind: CharacterKind
     public let customizations: [CustomizationOption]
