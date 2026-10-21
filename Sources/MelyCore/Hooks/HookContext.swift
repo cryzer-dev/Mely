@@ -12,6 +12,9 @@ public enum HookContext {
     public static let entrypoint = "claude_entrypoint"
     /// Controlling terminal of the `claude` process ("/dev/ttys004"), to pick the Terminal tab.
     public static let tty = "tty"
+    /// The Claude Code process (pid and start time): the session ends when it exits.
+    public static let claudePid = "claude_pid"
+    public static let claudeStart = "claude_start"
 
     /// Adds host context without overwriting what the payload already has.
     /// - Parameters:
@@ -19,7 +22,7 @@ public enum HookContext {
     ///     (found by walking the process tree); it identifies JetBrains IDEs, whose
     ///     terminal sets neither `TERM_PROGRAM` nor, reliably, `__CFBundleIdentifier`.
     public static func enrich(_ payload: inout [String: Any], env: [String: String],
-                              hostApp: String?, cwd: String, tty: String? = nil) {
+                              hostApp: String?, cwd: String, tty: String? = nil, claude: ProcessIdentity? = nil) {
         func setDefault(_ key: String, _ value: String?) {
             guard payload[key] == nil, let value, !value.isEmpty else { return }
             payload[key] = value
@@ -32,6 +35,10 @@ public enum HookContext {
         setDefault(termSessionId, env["TERM_SESSION_ID"])
         setDefault(entrypoint, env["CLAUDE_CODE_ENTRYPOINT"])
         setDefault(Self.tty, tty)
+        if let claude, payload[claudePid] == nil {
+            payload[claudePid] = Int(claude.pid)
+            payload[claudeStart] = claude.start
+        }
         if (payload["cwd"] as? String)?.isEmpty ?? true {
             payload["cwd"] = cwd
         }

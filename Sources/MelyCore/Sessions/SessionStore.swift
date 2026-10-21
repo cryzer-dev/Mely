@@ -41,6 +41,7 @@ public final class SessionStore {
     public private(set) var sessions: [ClaudeSession] = []
 
     /// A session silent this long is gone (its SessionEnd never came: killed terminal, crash).
+    /// Sessions whose process is known end with it instead (`SessionWatcher`).
     public static let maxSilence: TimeInterval = 12 * 3600
     /// A turn silent this long lost its Stop: the session stops counting as working.
     public static let maxTurnSilence: TimeInterval = 30 * 60
@@ -74,6 +75,8 @@ public final class SessionStore {
             s.origin = origin
             s.host = SessionHost.resolve(origin)
         }
+        // A resumed session runs in a new process.
+        if let process = origin.process { s.origin.process = process }
         s.lastSeen = now
 
         switch event {

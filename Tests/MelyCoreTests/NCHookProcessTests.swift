@@ -8,10 +8,17 @@ import Foundation
         .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         .appendingPathComponent(".build/debug/nc-hook")
 
-    private func run(_ args: [String], stdin: String, socket: String) throws -> (out: String, status: Int32, seconds: Double) {
+    /// `throughShell`: as Claude Code may start it, `sh -c nc-hook`.
+    private func run(_ args: [String], stdin: String, socket: String,
+                     throughShell: Bool = false) throws -> (out: String, status: Int32, seconds: Double) {
         let p = Process()
-        p.executableURL = Self.binary
-        p.arguments = args
+        if throughShell {
+            p.executableURL = URL(fileURLWithPath: "/bin/sh")
+            p.arguments = ["-c", "\"$0\" \"$@\"", Self.binary.path] + args
+        } else {
+            p.executableURL = Self.binary
+            p.arguments = args
+        }
         var env = ProcessInfo.processInfo.environment
         env["MELY_SOCKET_PATH"] = socket
         p.environment = env
@@ -50,6 +57,16 @@ import Foundation
         #expect(r.out.contains(#""behavior":"allow""#))
     }
 
+    /// The session's process is the one that runs the hook, past the shell in between.
+    @Test func sendsTheClaudeProcess() throws {
+        let path = tempSocket()
+        let server = try OneShotServer(path: path, reply: "")
+        _ = try run([], stdin: #"{"hook_event_name":"Stop","session_id":"s"}"#, socket: path, throughShell: true)
+        let received = server.waitForRequest()
+        let me = try #require(ProcessIdentity.running(ProcessInfo.processInfo.processIdentifier)?.identity)
+        #expect(HookOrigin(received ?? [:]).process == me)
+    }
+
     @Test func askHookIgnoresOtherTools() throws {
         let r = try run(["--ask"], stdin: #"{"hook_event_name":"PreToolUse","tool_name":"Bash"}"#, socket: tempSocket())
         #expect(r.status == 0 && r.out.isEmpty)
@@ -84,8 +101,11 @@ final class OneShotServer: @unchecked Sendable {
                 data += buf[0..<n]
             }
             request = (try? JSONSerialization.jsonObject(with: Data(data))) as? [String: Any]
-            let out = Array((reply + "\n").utf8)
-            _ = out.withUnsafeBytes { send(client, $0.baseAddress, $0.count, 0) }
+            // No reply for fire-and-forget events: the relay has hung up, a send would SIGPIPE.
+            if !reply.isEmpty {
+                let out = Array((reply + "\n").utf8)
+                _ = out.withUnsafeBytes { send(client, $0.baseAddress, $0.count, 0) }
+            }
             close(client)
             done.signal()
         }

@@ -13,6 +13,8 @@ public struct HookOrigin: Equatable, Sendable {
     public var tty: String
     /// `CLAUDE_CODE_ENTRYPOINT`: "cli", "claude-desktop" (Code tab of the Claude app)…
     public var entrypoint: String
+    /// The Claude Code process; nil from an older `nc-hook`.
+    public var process: ProcessIdentity?
 
     public var projectName: String {
         let name = URL(fileURLWithPath: cwd).lastPathComponent
@@ -31,6 +33,10 @@ public struct HookOrigin: Equatable, Sendable {
         termSessionId = s(HookContext.termSessionId)
         tty = s(HookContext.tty)
         entrypoint = s(HookContext.entrypoint)
+        if let pid = (p[HookContext.claudePid] as? NSNumber)?.int32Value,
+           let start = (p[HookContext.claudeStart] as? NSNumber)?.doubleValue {
+            process = ProcessIdentity(pid: pid, start: start)
+        }
     }
 }
 

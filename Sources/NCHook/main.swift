@@ -70,7 +70,8 @@ guard !payload.isEmpty else { exit(0) }
 HookContext.enrich(&payload, env: ProcessInfo.processInfo.environment,
                    hostApp: ProcessTree.hostAppBundleId(),
                    cwd: FileManager.default.currentDirectoryPath,
-                   tty: ProcessTree.controllingTTY())
+                   tty: ProcessTree.controllingTTY(),
+                   claude: ProcessTree.claudeProcess())
 
 // MARK: AskUserQuestion (--ask, PreToolUse)
 

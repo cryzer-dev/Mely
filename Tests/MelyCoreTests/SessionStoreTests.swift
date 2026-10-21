@@ -72,4 +72,49 @@ import Foundation
         #expect(StepLabel.label(tool: "mcp__github__create_pr", input: [:]) == "github · create_pr")
         #expect(StepLabel.label(tool: "Unknown", input: [:]) == "Unknown")
     }
+
+    @Test func keepsTheProcessOfTheSession() {
+        let store = SessionStore()
+        var p = ["session_id": "a", "cwd": "/w/shop"] as [String: Any]
+        store.apply(.sessionStart, origin: HookOrigin(p), now: t0)
+        #expect(store.session("a")?.origin.process == nil)
+        p["claude_pid"] = 4242
+        p["claude_start"] = 1_700_000_000.5
+        store.apply(.userPrompt("hi"), origin: HookOrigin(p), now: t0)
+        #expect(store.session("a")?.origin.process == ProcessIdentity(pid: 4242, start: 1_700_000_000.5))
+        // `claude --resume` continues the session in another process.
+        p["claude_pid"] = 5151
+        store.apply(.userPrompt("again"), origin: HookOrigin(p), now: t0)
+        #expect(store.session("a")?.origin.process?.pid == 5151)
+        // An event without the process (an older relay) keeps the known one.
+        store.apply(.stop(lastMessage: nil), origin: HookOrigin(["session_id": "a"]), now: t0)
+        #expect(store.session("a")?.origin.process?.pid == 5151)
+    }
+}
+
+@Suite struct ProcessIdentityTests {
+    @Test func skipsShellsToTheClaudeProcess() {
+        let sh = ProcessIdentity(pid: 30, start: 3), node = ProcessIdentity(pid: 20, start: 2)
+        #expect(ProcessIdentity.claude(among: [(sh, "sh"), (ProcessIdentity(pid: 25, start: 2.5), "zsh"), (node, "node")]) == node)
+        #expect(ProcessIdentity.claude(among: [(node, "2.1.304")]) == node)
+        #expect(ProcessIdentity.claude(among: [(sh, "bash")]) == nil)
+        #expect(ProcessIdentity.claude(among: []) == nil)
+    }
+
+    @Test func aliveDeadAndReusedPids() throws {
+        let me = try #require(ProcessIdentity.running(ProcessInfo.processInfo.processIdentifier)?.identity)
+        #expect(me.isAlive())
+        // The same pid started at another time is another process.
+        #expect(!ProcessIdentity(pid: me.pid, start: me.start - 60).isAlive())
+
+        let done = Process()
+        done.executableURL = URL(fileURLWithPath: "/usr/bin/true")
+        try done.run()
+        let pid = done.processIdentifier
+        done.waitUntilExit()
+        #expect(!ProcessIdentity(pid: pid, start: me.start).isAlive())
+
+        #expect(ProcessIdentity(pid: 7, start: 100).isAlive { $0 == 7 ? 100.2 : nil })
+        #expect(!ProcessIdentity(pid: 7, start: 100).isAlive { _ in nil })
+    }
 }

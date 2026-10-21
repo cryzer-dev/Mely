@@ -17,6 +17,7 @@ final class ClaudeSessionsController {
     private let peek: (PeekContent) -> Void
     private var settleTasks: [String: Task<Void, Never>] = [:]
     private var sweepTimer: Timer?
+    private lazy var watcher = SessionWatcher { [weak self] id in self?.processEnded(id) }
 
     /// How long "Готово" stays before the session rests.
     static let finishedHold: Duration = .milliseconds(5200)
@@ -55,9 +56,11 @@ final class ClaudeSessionsController {
         }
         log.info("event \(event.name, privacy: .public) session=\(origin.sessionId.prefix(8), privacy: .public) host=\(origin.hostBundleId, privacy: .public) state=\(session.map { SessionStore.stateName($0.state) } ?? "-", privacy: .public)")
         guard let session else {
+            watcher.forget(origin.sessionId)
             island.remove(id: "session-\(origin.sessionId)")
             return
         }
+        if let process = session.origin.process { watcher.watch(session.id, process: process) }
         let itemId = "session-\(session.id)"
         switch session.state {
         case .thinking, .working:
@@ -91,6 +94,12 @@ final class ClaudeSessionsController {
         default:
             island.remove(id: itemId)
         }
+    }
+
+    /// The session's process exited without SessionEnd: end it the same way.
+    private func processEnded(_ id: String) {
+        guard let session = store.session(id) else { return }
+        handle(.sessionEnd, origin: session.origin, responder: nil)
     }
 
     /// The user clicked a button on the card.

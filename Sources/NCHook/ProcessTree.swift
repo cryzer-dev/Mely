@@ -21,6 +21,19 @@ enum ProcessTree {
         return nil
     }
 
+    /// The Claude Code process that runs this hook: the nearest ancestor that is not a shell.
+    static func claudeProcess() -> ProcessIdentity? {
+        var ancestors: [(identity: ProcessIdentity, name: String)] = []
+        var pid = getppid()
+        for _ in 0..<8 where pid > 1 {
+            guard let p = ProcessIdentity.running(pid) else { break }
+            ancestors.append((p.identity, p.name))
+            if !ProcessIdentity.shells.contains(p.name) { break }
+            pid = p.parent
+        }
+        return ProcessIdentity.claude(among: ancestors)
+    }
+
     /// "/dev/ttysNNN" of the nearest ancestor attached to a terminal (the hook's own stdio are pipes).
     static func controllingTTY() -> String? {
         var pid = getppid()
