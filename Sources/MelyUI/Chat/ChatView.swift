@@ -107,9 +107,24 @@ public struct ChatView: View {
         }
     }
 
-    /// Attachments on the left, the model pill on the right.
+    /// A new conversation and the attachments on the left, the model pill on the right.
     private var footer: some View {
         HStack(spacing: 6) {
+            if !conversation.messages.isEmpty {
+                Button(action: newConversation) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "square.and.pencil").font(.system(size: MelyType.micro, weight: .semibold))
+                        Text("Новый разговор").font(.system(size: MelyType.caption, weight: .medium))
+                    }
+                    .foregroundStyle(.white.opacity(MelyInk.secondary))
+                    .padding(.horizontal, 8).padding(.vertical, 4)
+                    .background(.white.opacity(MelyFill.card), in: Capsule())
+                    .fixedSize()
+                }
+                .buttonStyle(.plain)
+                .help("Начать заново: Claude забудет этот разговор (⌘N)")
+                .layoutProbe("chat.new", row: "chat.footer", inside: "content")
+            }
             ForEach(conversation.pending) { file in
                 HStack(spacing: 4) {
                     Image(systemName: icon(file.kind)).font(.system(size: MelyType.caption))
@@ -206,7 +221,7 @@ public struct ChatView: View {
                 .accessibilityLabel("Отправить")
             }
             // ⌘N: a new conversation.
-            Button("") { conversation.clear(); draft = ""; fieldFocused = true }
+            Button("", action: newConversation)
                 .keyboardShortcut("n", modifiers: .command)
                 .opacity(0).frame(width: 0, height: 0)
                 .accessibilityHidden(true)
@@ -233,6 +248,13 @@ public struct ChatView: View {
         .padding(10)
         .background(.white.opacity(MelyFill.card), in: RoundedRectangle(cornerRadius: MelyRadius.medium))
         .layoutProbe("chat.setup", inside: "content")
+    }
+
+    /// Stops an answer still coming and forgets the conversation, its files and window.
+    private func newConversation() {
+        conversation.clear()
+        draft = ""
+        fieldFocused = true
     }
 
     private func send() {

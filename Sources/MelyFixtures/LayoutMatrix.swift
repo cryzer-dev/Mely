@@ -120,6 +120,17 @@ public enum LayoutMatrix {
                 c.attach(files)
                 return c
             }, openInClaude: true)),
+            // The fullest footer: a new conversation, two files, «Открыть в Claude», the model.
+            expanded("Chat_FullFooter", screen, .chat, page: page({
+                let c = Fixtures.conversation(FixtureChatTransport(answer: "Готово."))
+                await Fixtures.ask(c, "Привет")
+                let dir = FileManager.default.temporaryDirectory
+                let files = ["Снимок экрана 2026-10-22 в 11.40.15 очень длинное имя.png", "Отчёт по корзине за третий квартал.pdf"]
+                    .map { dir.appendingPathComponent($0) }
+                for file in files { try? Data([0x89, 0x50, 0x4E, 0x47]).write(to: file) }
+                c.attach(files)
+                return c
+            }, openInClaude: true)),
             expanded("Chat_Long", screen, .chat, page: page({
                 let c = Fixtures.conversation(FixtureChatTransport(answer: Fixtures.longAnswer))
                 await Fixtures.ask(c, "Почему в корзине копейки не сходятся?")

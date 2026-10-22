@@ -24,6 +24,21 @@ private final class FakeTransport: ChatTransport, @unchecked Sendable {
     }
 }
 
+/// Starts an answer and never finishes it: the chat stays streaming until cancelled.
+private final class HoldingTransport: ChatTransport, @unchecked Sendable {
+    private(set) var requests: [[ChatTurn]] = []
+    private(set) var resets = 0
+
+    func stream(apiKey: String, model: ChatModel, history: [ChatTurn]) -> AsyncThrowingStream<SSEEvent, Error> {
+        requests.append(history)
+        return AsyncThrowingStream { c in
+            c.yield(ev(#"{"type":"content_block_start","index":0,"content_block":{"type":"text","text":"Сейчас"}}"#))
+        }
+    }
+
+    func reset() { resets += 1 }
+}
+
 private func ev(_ json: String) -> SSEEvent {
     let type = (try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])?["type"] as? String ?? ""
     return SSEEvent(event: type, data: json)
@@ -251,6 +266,29 @@ private let answer: [SSEEvent] = [
         #expect(second.content.count == 1)
         chat.clear()
         #expect(chat.context == nil)
+    }
+
+    /// «Новый разговор» (and ⌘N): an answer still coming stops, and the next question goes
+    /// without the old conversation.
+    @Test func newConversationStopsTheAnswerAndForgets() async throws {
+        let transport = HoldingTransport()
+        let chat = ChatConversation(transport: transport, apiKey: { "k" }, model: { .opus })
+        chat.offer(context: ChatContext(appName: "Safari", windowTitle: "Корзина", url: nil))
+        chat.send("Первый вопрос")
+        try await waitUntil { chat.messages.last?.text == "Сейчас" }
+        #expect(chat.isStreaming)
+        chat.clear()
+        #expect(chat.messages.isEmpty)
+        #expect(!chat.isStreaming)
+        #expect(chat.context == nil)
+        #expect(transport.resets == 1)
+        chat.send("Второй вопрос")
+        try await waitUntil { chat.messages.last?.text == "Сейчас" }
+        #expect(transport.requests.count == 2)
+        let second = try #require(transport.requests.last)
+        #expect(second.count == 1)
+        #expect((second.first?.content.first?["text"] as? String)?.contains("Второй вопрос") == true)
+        #expect(chat.messages.map(\.text) == ["Второй вопрос", "Сейчас"])
     }
 
     @Test func melyDroppedOnAWindowStartsAConversationAboutIt() async throws {
