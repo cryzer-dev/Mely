@@ -17,6 +17,8 @@ final class NowPlayingIntegration: Integration {
     let summary = "Мини-плеер: Яндекс Музыка, YouTube в браузере и другие плееры"
     private(set) var status: IntegrationStatus = .off
     let model = NowPlayingModel()
+    /// Which new tracks get a preview: not while they flick by, not from silenced apps.
+    let peeks = NowPlayingPeeks()
 
     @ObservationIgnored private var process: Process?
     @ObservationIgnored private var readTask: Task<Void, Never>?
@@ -106,6 +108,7 @@ final class NowPlayingIntegration: Integration {
             try? await Task.sleep(for: .milliseconds(600))
             guard !Task.isCancelled, let self, let np = self.model.current, np.isPlaying else { return }
             log.info("playing from \(np.sourceBundleId, privacy: .public)")
+            guard self.peeks.allows(np) else { return }
             self.peek?(PeekContent(id: "now-playing", symbol: "music.note", tint: .blue, title: np.title,
                                    subtitle: np.artist ?? NowPlayingIntegration.appName(np.sourceBundleId),
                                    appBundleId: np.sourceBundleId, artwork: np.artwork))

@@ -55,3 +55,58 @@ extension NowPlaying {
                   elapsed: nil, timestamp: nil, isPlaying: isPlaying, rate: rate, artwork: nil, prohibitsSkip: prohibitsSkip)
     }
 }
+
+/// When a new track gets a preview (openspec now-playing: «не мешает», «по приложениям»).
+@MainActor
+@Suite struct NowPlayingPeeksTests {
+    let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+
+    func peeks() -> NowPlayingPeeks {
+        let suite = "mely-peeks-\(UUID().uuidString)"
+        return NowPlayingPeeks(defaults: UserDefaults(suiteName: suite)!)
+    }
+
+    func track(_ title: String, app: String = "ru.yandex.desktop.music", parent: String? = nil) -> NowPlaying {
+        NowPlaying(bundleId: app, parentBundleId: parent, title: title, artist: nil, album: nil, duration: 200, elapsed: 0,
+                   timestamp: nil, isPlaying: true, rate: 1, artwork: nil, prohibitsSkip: false)
+    }
+
+    @Test func shortsAfterTheFirstGoQuiet() {
+        let p = peeks()
+        let chrome = "com.google.Chrome"
+        #expect(p.allows(track("Длинное видео", app: chrome), now: t0))
+        #expect(p.allows(track("Шортс 1", app: chrome), now: t0.addingTimeInterval(180)))
+        #expect(!p.allows(track("Шортс 2", app: chrome), now: t0.addingTimeInterval(195)))
+        #expect(!p.allows(track("Шортс 3", app: chrome), now: t0.addingTimeInterval(210)))
+        // Stayed on one a while: the next is shown again.
+        #expect(p.allows(track("Видео", app: chrome), now: t0.addingTimeInterval(300)))
+    }
+
+    @Test func skippingTracksAndResuming() {
+        let p = peeks()
+        #expect(p.allows(track("Первый"), now: t0))
+        #expect(p.allows(track("Второй"), now: t0.addingTimeInterval(200)))   // played to its end
+        #expect(!p.allows(track("Третий"), now: t0.addingTimeInterval(203)))  // «Следующий»
+        // Play after a pause: the same track, not something new.
+        #expect(p.allows(track("Третий"), now: t0.addingTimeInterval(210)))
+    }
+
+    @Test func silencedAppsAndTheSwitch() {
+        let suite = "mely-peeks-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        let p = NowPlayingPeeks(defaults: defaults)
+        p.setMuted("com.google.Chrome", true)
+        #expect(!p.allows(track("Видео", app: "com.google.Chrome.helper", parent: "com.google.Chrome"), now: t0))
+        #expect(p.allows(track("Песня"), now: t0.addingTimeInterval(100)))
+        #expect(p.apps == ["ru.yandex.desktop.music", "com.google.Chrome"])
+        p.isOn = false
+        #expect(!p.allows(track("Другая"), now: t0.addingTimeInterval(300)))
+        // Kept across launches.
+        let again = NowPlayingPeeks(defaults: defaults)
+        #expect(!again.isOn)
+        #expect(again.isMuted("com.google.Chrome"))
+        #expect(again.apps.first == "ru.yandex.desktop.music")
+        again.setMuted("com.google.Chrome", false)
+        #expect(!NowPlayingPeeks(defaults: defaults).isMuted("com.google.Chrome"))
+    }
+}

@@ -12,6 +12,8 @@ public struct GeneralSettingsView: View {
     let displayChanged: () -> Void
     /// Settings → Обновления; nil hides the section.
     let updates: UpdateState?
+    /// Previews of new tracks; nil hides the music section.
+    let peeks: NowPlayingPeeks?
 
     /// What the sound section can do; the app plays and finds the files.
     public struct Sounds {
@@ -55,9 +57,10 @@ public struct GeneralSettingsView: View {
     }
 
     public init(behavior: IslandBehavior, sounds: Sounds, launchAtLogin: Binding<Bool>, updates: UpdateState? = nil,
-                displayChanged: @escaping () -> Void) {
+                peeks: NowPlayingPeeks? = nil, displayChanged: @escaping () -> Void) {
         self.behavior = behavior
         self.updates = updates
+        self.peeks = peeks
         self.sounds = sounds
         self.launchAtLogin = launchAtLogin
         self.displayChanged = displayChanged
@@ -116,6 +119,8 @@ public struct GeneralSettingsView: View {
                     Text(Self.fullScreenHint(behavior.fullScreenMode))
                 }
             }
+
+            if let peeks { MusicPeeksSection(peeks: peeks) }
 
             Section {
                 Toggle("Звуки", isOn: $behavior.soundOn)
@@ -231,6 +236,37 @@ public struct ShortcutsSettingsView: View {
                 .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
                 .frame(width: 110, alignment: .leading)
             Text(what)
+        }
+    }
+}
+
+/// Settings → Основные → Музыка: previews of new tracks, all of them and per app.
+struct MusicPeeksSection: View {
+    let peeks: NowPlayingPeeks
+
+    var body: some View {
+        @Bindable var peeks = peeks
+        Section {
+            Toggle(isOn: $peeks.isOn) {
+                Text("Подсказка «Сейчас играет»")
+                Text("Обложка и название под челкой, когда начинается песня или видео. Пока они быстро сменяют друг друга (шортсы, перелистывание), подсказки нет")
+            }
+            ForEach(peeks.apps, id: \.self) { app in
+                Toggle(isOn: Binding(get: { !peeks.isMuted(app) }, set: { peeks.setMuted(app, !$0) })) {
+                    HStack(spacing: 8) {
+                        AppIcon(bundleId: app).frame(width: 18, height: 18)
+                        Text(MiniPlayerView.appName(app))
+                    }
+                }
+                .disabled(!peeks.isOn)
+            }
+        } header: {
+            Text("Музыка и видео")
+        } footer: {
+            Text(peeks.apps.isEmpty
+                 ? "Здесь появятся приложения, из которых что-то играло. Подсказку для играющего приложения можно выключить и на вкладке «Музыка» — колокольчиком."
+                 : "Подсказку для играющего приложения можно выключить и на вкладке «Музыка» — колокольчиком. Мини-плеер и обложка в полоске работают всегда.")
+                .foregroundStyle(.secondary)
         }
     }
 }

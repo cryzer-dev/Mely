@@ -27,7 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var updates: UpdateController?
     private let fullScreen = FullScreenWatcher()
     private lazy var settings = SettingsWindowController(registry: registry, characters: characterSettings, behavior: behavior,
-                                                         updates: updateState,
+                                                         updates: updateState, peeks: nowPlaying.peeks,
                                                          displayChanged: { [weak self] in self?.island?.relocateToChosenScreen() })
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -335,7 +335,7 @@ private struct ExpandedIsland: View {
                            if let link = event.meeting { calendar.join(link) }
                        }),
                        music: nowPlaying.status == .running && nowPlaying.model.isVisible()
-                           ? AnyView(MiniPlayerView(model: nowPlaying.model, send: { nowPlaying.send($0) },
+                           ? AnyView(MiniPlayerView(model: nowPlaying.model, peeks: nowPlaying.peeks, send: { nowPlaying.send($0) },
                                                     openSource: { nowPlaying.openSource($0) }))
                            : nil,
                        open: { HostActivator.activate($0.host, origin: $0.origin) },

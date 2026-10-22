@@ -251,8 +251,8 @@ enum Snapshots {
         behavior.collapseAfter = IslandBehavior.never
         return GeneralSettingsView(behavior: behavior,
                                    sounds: .init(test: {}, openFolder: {}, reload: { 2 }, customized: 2),
-                                   launchAtLogin: .constant(true), displayChanged: {})
-            .frame(width: 560, height: 760)
+                                   launchAtLogin: .constant(true), peeks: Fixtures.peeks(), displayChanged: {})
+            .frame(width: 560, height: 980)
     }
 
     /// Settings → Основные → Обновления in each state, and a long local version.

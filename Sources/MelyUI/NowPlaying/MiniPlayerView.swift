@@ -5,11 +5,15 @@ import MelyCore
 /// The "Музыка" tab: what plays, where, how far, with controls.
 public struct MiniPlayerView: View {
     let model: NowPlayingModel
+    /// The bell by the source app: its new tracks with or without a preview.
+    let peeks: NowPlayingPeeks?
     let send: (MediaCommand) -> Void
     let openSource: (String) -> Void
 
-    public init(model: NowPlayingModel, send: @escaping (MediaCommand) -> Void, openSource: @escaping (String) -> Void) {
+    public init(model: NowPlayingModel, peeks: NowPlayingPeeks? = nil, send: @escaping (MediaCommand) -> Void,
+                openSource: @escaping (String) -> Void) {
         self.model = model
+        self.peeks = peeks
         self.send = send
         self.openSource = openSource
     }
@@ -31,13 +35,18 @@ public struct MiniPlayerView: View {
                     if let artist = np.artist {
                         Text(artist).font(.system(size: MelyType.body)).foregroundStyle(.white.opacity(MelyInk.strong)).lineLimit(1)
                     }
-                    Button { openSource(np.sourceBundleId) } label: {
-                        HStack(spacing: 5) {
-                            AppIcon(bundleId: np.sourceBundleId).frame(width: 14, height: 14)
-                            Text(Self.appName(np.sourceBundleId)).font(.system(size: MelyType.caption)).foregroundStyle(.white.opacity(MelyInk.secondary))
+                    HStack(spacing: 8) {
+                        Button { openSource(np.sourceBundleId) } label: {
+                            HStack(spacing: 5) {
+                                AppIcon(bundleId: np.sourceBundleId).frame(width: 14, height: 14)
+                                Text(Self.appName(np.sourceBundleId)).font(.system(size: MelyType.caption)).foregroundStyle(.white.opacity(MelyInk.secondary))
+                                    .lineLimit(1)
+                            }
                         }
+                        .buttonStyle(.plain)
+                        .layoutProbe("music.source", row: "music.source", inside: "music.info")
+                        if let peeks { PeekBell(peeks: peeks, app: np.sourceBundleId).layoutProbe("music.bell", row: "music.source", inside: "music.info") }
                     }
-                    .buttonStyle(.plain)
                     Spacer(minLength: 0)
                     TimelineView(.periodic(from: .now, by: 1)) { context in
                         Progress(position: np.position(at: context.date), duration: np.duration)
@@ -84,6 +93,31 @@ public struct MiniPlayerView: View {
     public static func appName(_ bundleId: String) -> String {
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) else { return bundleId }
         return FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
+    }
+}
+
+/// Previews of this app's new tracks: on (a bell) or off (crossed out).
+private struct PeekBell: View {
+    let peeks: NowPlayingPeeks
+    let app: String
+    @State private var hovered = false
+
+    var body: some View {
+        let muted = peeks.isMuted(app) || !peeks.isOn
+        let name = MiniPlayerView.appName(app)
+        Button { peeks.setMuted(app, !peeks.isMuted(app)) } label: {
+            Image(systemName: muted ? "bell.slash" : "bell")
+                .font(.system(size: MelyType.caption, weight: .semibold))
+                .foregroundStyle(.white.opacity(hovered ? MelyInk.primary : MelyInk.tertiary))
+                .frame(width: 20, height: 18)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!peeks.isOn)
+        .onHover { hovered = $0 }
+        .help(!peeks.isOn ? "Подсказка «Сейчас играет» выключена в настройках"
+              : muted ? "Показывать подсказку «Сейчас играет» из \(name)" : "Не показывать подсказку «Сейчас играет» из \(name)")
+        .accessibilityLabel(muted ? "Подсказки из \(name) выключены" : "Подсказки из \(name) включены")
     }
 }
 

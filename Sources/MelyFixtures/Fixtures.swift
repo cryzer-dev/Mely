@@ -330,11 +330,22 @@ public enum Fixtures {
         return model
     }
 
+    /// Previews from the browser silenced, as after a click on its bell.
+    public static func peeks() -> NowPlayingPeeks {
+        let suite = "mely-fixtures-peeks"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let peeks = NowPlayingPeeks(defaults: defaults)
+        peeks.setMuted("com.google.Chrome", true)
+        peeks.setMuted("ru.yandex.desktop.music", false)
+        return peeks
+    }
+
     public static func musicPage(_ model: NowPlayingModel) -> some View {
         let tabs = IslandTabs()
         tabs.selected = .music
         return ClaudeOverview(store: SessionStore(), queue: ApprovalQueue(), tabs: tabs,
-                              music: AnyView(MiniPlayerView(model: model, send: { _ in }, openSource: { _ in })),
+                              music: AnyView(MiniPlayerView(model: model, peeks: peeks(), send: { _ in }, openSource: { _ in })),
                               open: { _ in }, decide: { _, _ in }, answerInTerminal: { _ in })
     }
 }
