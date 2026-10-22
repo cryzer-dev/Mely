@@ -8,9 +8,7 @@ import MelyFixtures
 @Suite struct IslandLayoutTests {
     /// Bugs the checks found that are not fixed yet, by a part of the failure text. Each one
     /// goes with its fix: a known issue that stops happening fails the test.
-    static let knownIssues: [(match: String, why: String)] = [
-        ("header.usage без содержимого", "Пустая капсула лимитов в шапке без данных о 5-часовом окне"),
-    ]
+    static let knownIssues: [(match: String, why: String)] = []
 
     @Test func everyVariantHolds() async {
         var failures: [String] = []

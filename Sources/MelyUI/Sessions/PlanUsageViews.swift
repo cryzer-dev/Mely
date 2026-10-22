@@ -65,12 +65,15 @@ public struct PlanUsageGauge: View {
 }
 
 /// Compact island: the five-hour window as a ring and its percent; a window used up
-/// shows when it comes back instead (`PlanUsage.compactWindow`).
+/// shows when it comes back instead (`PlanUsage.compactWindow`). Nothing to show: nothing,
+/// or with `showsEmpty` (the header's pill, which must not stand empty) a dim ring and «—».
 public struct CompactPlanGauge: View {
     let usage: PlanUsage?
+    let showsEmpty: Bool
 
-    public init(usage: PlanUsage?) {
+    public init(usage: PlanUsage?, showsEmpty: Bool = false) {
         self.usage = usage
+        self.showsEmpty = showsEmpty
     }
 
     public var body: some View {
@@ -99,6 +102,17 @@ public struct CompactPlanGauge: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(Self.label(kind, w, now: context.date))
                 .help(Self.label(kind, w, now: context.date))
+            } else if showsEmpty {
+                HStack(spacing: 4) {
+                    Circle().stroke(.white.opacity(0.2), lineWidth: 2.2).frame(width: 11, height: 11)
+                    Text("—")
+                        .font(.system(size: MelyType.footnote, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white.opacity(MelyInk.tertiary))
+                }
+                .layoutProbe("plan.gauge")
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Лимиты Claude: нет данных")
+                .help("Лимиты Claude: нет данных")
             }
         }
     }

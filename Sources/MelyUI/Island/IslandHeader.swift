@@ -69,7 +69,7 @@ public struct IslandHeader: View {
             HStack(spacing: 4) {
                 if let usage {
                     Button { showsUsage.toggle() } label: {
-                        CompactPlanGauge(usage: usage.usage)
+                        CompactPlanGauge(usage: usage.usage, showsEmpty: true)
                             .padding(.horizontal, 7).frame(height: 22)
                             .background(.white.opacity(showsUsage ? 0.16 : 0.07), in: Capsule())
                             .contentShape(Capsule())
