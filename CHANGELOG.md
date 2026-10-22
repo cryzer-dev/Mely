@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.3.0](https://github.com/cryzer-dev/Mely/compare/v1.2.0...v1.3.0) (2026-10-22)
+
+
+### Новое
+
+* Добавлена кнопка «Новый разговор» в чате ([4f98eb7](https://github.com/cryzer-dev/Mely/commit/4f98eb77b51cafcce62191d053396445defcbc91))
+* Добавлена перемотка в мини-плеере ([861c573](https://github.com/cryzer-dev/Mely/commit/861c573ebe38434ea6be5a017126c7553c09efaa))
+* Подсказка «Сейчас играет» больше не мешает при шортсах и выключается по приложениям ([6edb5ca](https://github.com/cryzer-dev/Mely/commit/6edb5ca3d765971279fb584a1a3d1b58c597cc9a))
+
+
+### Исправления
+
+* Добавлено копирование и вставка в чате, сообщения в чате теперь видны целиком ([d8c3031](https://github.com/cryzer-dev/Mely/commit/d8c3031778293082bb4b817d29d8e9dc392cdc4f))
+* Исправлен индикатор лимитов в шапке при пустых данных ([f779016](https://github.com/cryzer-dev/Mely/commit/f77901614be951fa8a9883e7b12d6d8a69a8e793))
+
 ## [1.2.0](https://github.com/cryzer-dev/Mely/compare/v1.1.0...v1.2.0) (2026-10-21)
 
 
