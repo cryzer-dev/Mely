@@ -126,6 +126,18 @@ final class NowPlayingIntegration: Integration {
         try? process.run()
     }
 
+    /// Jumps to `position` (seconds) in what plays: the adapter's `seek` takes microseconds.
+    func seek(to position: TimeInterval) {
+        guard let adapter = Self.adapter, model.current?.canSeek == true else { return }
+        model.seek(to: position)
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/perl")
+        process.arguments = [adapter.script.path, adapter.framework.path, "seek", String(Int64(position * 1_000_000))]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try? process.run()
+    }
+
     func openSource(_ bundleId: String) {
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) else { return }
         NSWorkspace.shared.openApplication(at: url, configuration: .init(), completionHandler: nil)

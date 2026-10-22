@@ -39,6 +39,9 @@ public struct NowPlaying: Equatable, Sendable {
     /// The app to show and open: the browser for web players.
     public var sourceBundleId: String { parentBundleId ?? bundleId }
 
+    /// Has a length to move along (a live stream has none).
+    public var canSeek: Bool { (duration ?? 0) > 0 }
+
     /// Position now, moved on by the time passed while playing.
     public func position(at now: Date = Date()) -> TimeInterval? {
         guard let elapsed else { return nil }
@@ -104,6 +107,15 @@ public final class NowPlayingModel {
         if state?.isPlaying == true { stoppedAt = nil } else if stoppedAt == nil { stoppedAt = min(state?.timestamp ?? now, now) }
         current = state
         return started
+    }
+
+    /// The player was asked to jump to `position`: shown there at once, not after its next
+    /// report (the bar would snap back meanwhile).
+    public func seek(to position: TimeInterval, now: Date = Date()) {
+        guard var np = current, np.canSeek else { return }
+        np.elapsed = min(max(0, position), np.duration ?? position)
+        np.timestamp = now
+        current = np
     }
 
     /// The mini-player is worth showing.

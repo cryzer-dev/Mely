@@ -8,13 +8,16 @@ public struct MiniPlayerView: View {
     /// The bell by the source app: its new tracks with or without a preview.
     let peeks: NowPlayingPeeks?
     let send: (MediaCommand) -> Void
+    /// Jumps to a position (seconds); nil: the bar only shows it.
+    let seek: ((TimeInterval) -> Void)?
     let openSource: (String) -> Void
 
     public init(model: NowPlayingModel, peeks: NowPlayingPeeks? = nil, send: @escaping (MediaCommand) -> Void,
-                openSource: @escaping (String) -> Void) {
+                seek: ((TimeInterval) -> Void)? = nil, openSource: @escaping (String) -> Void) {
         self.model = model
         self.peeks = peeks
         self.send = send
+        self.seek = seek
         self.openSource = openSource
     }
 
@@ -49,7 +52,9 @@ public struct MiniPlayerView: View {
                     }
                     Spacer(minLength: 0)
                     TimelineView(.periodic(from: .now, by: 1)) { context in
-                        Progress(position: np.position(at: context.date), duration: np.duration)
+                        Progress(position: np.position(at: context.date), duration: np.duration,
+                                 seek: np.canSeek ? seek : nil)
+                            .layoutProbe("music.progress", inside: "music.info")
                     }
                     HStack(spacing: 22) {
                         control("backward.fill", "Предыдущий", enabled: !np.prohibitsSkip) { send(.previous) }
@@ -124,26 +129,61 @@ private struct PeekBell: View {
 private struct Progress: View {
     let position: TimeInterval?
     let duration: TimeInterval?
+    /// Jumps there; nil: the bar only shows the position.
+    let seek: ((TimeInterval) -> Void)?
+    /// Where the bar is being dragged to (0…1), while it is.
+    @State private var dragging: CGFloat?
+    @State private var hovered = false
 
     var body: some View {
         VStack(spacing: 3) {
             // A live stream has no length: no bar to fill, the same height kept.
             GeometryReader { geo in
+                let thick: CGFloat = seek != nil && (hovered || dragging != nil) ? 6 : 4
                 Capsule().fill(.white.opacity(MelyFill.selected))
                     .overlay(alignment: .leading) {
                         Capsule().fill(.white.opacity(MelyInk.primary))
-                            .frame(width: geo.size.width * fraction)
+                            .frame(width: geo.size.width * (dragging ?? fraction))
                     }
+                    .frame(height: thick)
+                    .frame(maxHeight: .infinity)
+                    .contentShape(Rectangle())
+                    .gesture(seekGesture(width: geo.size.width), including: seek != nil ? .all : .none)
+                    .onHover { hovered = $0 }
+                    .animation(.easeOut(duration: 0.12), value: thick)
             }
-            .frame(height: 4)
+            // Easier to hit than to see: 14 pt to grab, 4 pt drawn, laid out as 4.
+            .frame(height: 14)
+            .padding(.vertical, -5)
             .opacity(hasLength ? 1 : 0)
             HStack {
-                Text(Self.clock(position)).font(.system(size: MelyType.micro)).monospacedDigit()
+                Text(Self.clock(dragging.flatMap { d in duration.map { Double(d) * $0 } } ?? position))
+                    .font(.system(size: MelyType.micro)).monospacedDigit()
                 Spacer()
                 Text(Self.clock(duration)).font(.system(size: MelyType.micro)).monospacedDigit()
             }
             .foregroundStyle(.white.opacity(MelyInk.tertiary))
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Позиция \(Self.clock(position)) из \(Self.clock(duration))")
+        .accessibilityAdjustableAction { direction in
+            guard let seek, let position, let duration else { return }
+            let step: TimeInterval = direction == .increment ? 10 : -10
+            seek(min(duration, max(0, position + step)))
+        }
+    }
+
+    /// A click jumps there, a drag shows where it will land and jumps on release.
+    private func seekGesture(width: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                dragging = min(1, max(0, value.location.x / max(1, width)))
+            }
+            .onEnded { value in
+                let target = min(1, max(0, value.location.x / max(1, width)))
+                if let duration { seek?(Double(target) * duration) }
+                dragging = nil
+            }
     }
 
     private var hasLength: Bool { (duration ?? 0) > 0 }

@@ -110,3 +110,34 @@ extension NowPlaying {
         #expect(!NowPlayingPeeks(defaults: defaults).isMuted("com.google.Chrome"))
     }
 }
+
+@MainActor
+@Suite struct NowPlayingSeekTests {
+    let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+
+    func song(duration: TimeInterval?) -> NowPlaying {
+        NowPlaying(bundleId: "ru.yandex.desktop.music", parentBundleId: nil, title: "Песня", artist: nil, album: nil,
+                   duration: duration, elapsed: 30, timestamp: t0, isPlaying: true, rate: 1, artwork: nil, prohibitsSkip: false)
+    }
+
+    /// The bar moves to the new place at once and plays on from there.
+    @Test func seekMovesThePositionAtOnce() {
+        let model = NowPlayingModel()
+        model.update(song(duration: 158), now: t0)
+        model.seek(to: 79, now: t0.addingTimeInterval(5))
+        #expect(model.current?.position(at: t0.addingTimeInterval(5)) == 79)
+        #expect(model.current?.position(at: t0.addingTimeInterval(15)) == 89)
+        // Past the end: the end.
+        model.seek(to: 500, now: t0.addingTimeInterval(20))
+        #expect(model.current?.position(at: t0.addingTimeInterval(20)) == 158)
+    }
+
+    @Test func aLiveStreamDoesNotSeek() {
+        let model = NowPlayingModel()
+        let live = song(duration: nil)
+        #expect(!live.canSeek)
+        model.update(live, now: t0)
+        model.seek(to: 79, now: t0.addingTimeInterval(5))
+        #expect(model.current?.elapsed == 30)
+    }
+}

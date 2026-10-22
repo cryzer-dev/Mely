@@ -345,7 +345,7 @@ public enum Fixtures {
         let tabs = IslandTabs()
         tabs.selected = .music
         return ClaudeOverview(store: SessionStore(), queue: ApprovalQueue(), tabs: tabs,
-                              music: AnyView(MiniPlayerView(model: model, peeks: peeks(), send: { _ in }, openSource: { _ in })),
+                              music: AnyView(MiniPlayerView(model: model, peeks: peeks(), send: { _ in }, seek: { _ in }, openSource: { _ in })),
                               open: { _ in }, decide: { _, _ in }, answerInTerminal: { _ in })
     }
 }

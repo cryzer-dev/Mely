@@ -336,6 +336,7 @@ private struct ExpandedIsland: View {
                        }),
                        music: nowPlaying.status == .running && nowPlaying.model.isVisible()
                            ? AnyView(MiniPlayerView(model: nowPlaying.model, peeks: nowPlaying.peeks, send: { nowPlaying.send($0) },
+                                                    seek: { nowPlaying.seek(to: $0) },
                                                     openSource: { nowPlaying.openSource($0) }))
                            : nil,
                        open: { HostActivator.activate($0.host, origin: $0.origin) },
