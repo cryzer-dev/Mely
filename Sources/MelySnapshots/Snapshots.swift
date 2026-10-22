@@ -21,7 +21,7 @@ enum Snapshots {
             Snapshot(name: "icon", view: AnyView(MelyAppIcon().frame(width: 160, height: 160))),
             Snapshot(name: "hero", view: AnyView(Desk { sessionsOverview() })),
             Snapshot(name: "approval", view: AnyView(Desk { requestCard(question: false) })),
-            Snapshot(name: "chat", view: AnyView(Desk { chat(hasKey: true) })),
+            Snapshot(name: "chat", view: AnyView(Desk { chat(hasKey: true, answer: readmeAnswer) })),
             Snapshot(name: "today", view: AnyView(Desk { calendarAgenda() })),
             Snapshot(name: "music", view: AnyView(Desk { miniPlayer() })),
             Snapshot(name: "reminder", view: AnyView(Desk(height: 128) { peekCard(PeekContent(
@@ -627,9 +627,14 @@ enum Snapshots {
             .environment(\.colorScheme, .dark)
     }
 
+    /// Short enough for the README picture to show the whole conversation.
+    static let readmeAnswer = "Скорее всего, скидка считается **до** округления. Округляйте цену позиции "
+        + "в `CartItem.total`, а скидку применяйте к сумме корзины."
+
     /// The chat tab after one question with a screenshot attached, or without a key.
-    @MainActor private static func chat(hasKey: Bool) -> some View {
-        let conversation = ChatConversation(transport: SampleChatTransport(),
+    @MainActor private static func chat(hasKey: Bool, answer: String? = nil) -> some View {
+        let transport: ChatTransport = answer.map { FixtureChatTransport(answer: $0) } ?? SampleChatTransport()
+        let conversation = ChatConversation(transport: transport,
                                             apiKey: { hasKey ? "k" : nil }, model: { .opus })
         let defaults = UserDefaults(suiteName: "mely-snapshots-chat")!
         defaults.removePersistentDomain(forName: "mely-snapshots-chat")
