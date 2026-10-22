@@ -118,6 +118,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         showFirstRunTips()
         setUpStatusItem()
+        setUpEditMenu()
         registry.permissions = permissions
         registry.register(claudeCode)
         registry.register(chat)
@@ -186,6 +187,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(withTitle: "Выйти из \(AppInfo.name)", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         item.menu = menu
         statusItem = item
+    }
+
+    /// ⌘C, ⌘V, ⌘X, ⌘A, ⌘Z in the chat and the settings fields (issue #4). AppKit sends them
+    /// through the main menu's key equivalents; an agent app has no menu bar, so without this
+    /// menu the keys reach nothing. Never shown: only its shortcuts are used.
+    private func setUpEditMenu() {
+        let main = NSMenu()
+        // AppKit takes the first item as the app menu.
+        main.addItem(NSMenuItem(title: AppInfo.name, action: nil, keyEquivalent: ""))
+        main.items[0].submenu = NSMenu(title: AppInfo.name)
+        let edit = NSMenu(title: "Правка")
+        edit.addItem(withTitle: "Отменить", action: Selector(("undo:")), keyEquivalent: "z")
+        edit.addItem(withTitle: "Повторить", action: Selector(("redo:")), keyEquivalent: "Z")
+        edit.addItem(.separator())
+        edit.addItem(withTitle: "Вырезать", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        edit.addItem(withTitle: "Скопировать", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        edit.addItem(withTitle: "Вставить", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        let plain = edit.addItem(withTitle: "Вставить без оформления", action: #selector(NSTextView.pasteAsPlainText(_:)),
+                                 keyEquivalent: "V")
+        plain.keyEquivalentModifierMask = [.command, .option, .shift]
+        edit.addItem(withTitle: "Выбрать все", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        let editItem = NSMenuItem(title: "Правка", action: nil, keyEquivalent: "")
+        editItem.submenu = edit
+        main.addItem(editItem)
+        NSApp.mainMenu = main
     }
 
     /// ⌃⌥Space: the chat tab with the cursor in the field. Without the chat integration,

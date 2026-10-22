@@ -59,11 +59,13 @@ public struct IslandHeader: View {
                         showsUsage = false
                         if item.tab == .chat { tabs.showChat() } else { tabs.selected = item.tab }
                     }
+                    .layoutProbe("header.tab.\(item.tab)", row: "header", inside: "island")
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             // The notch.
             Color.clear.frame(width: notchWidth)
+                .layoutProbe("header.notch", row: "header")
             HStack(spacing: 4) {
                 if let usage {
                     Button { showsUsage.toggle() } label: {
@@ -71,6 +73,7 @@ public struct IslandHeader: View {
                             .padding(.horizontal, 7).frame(height: 22)
                             .background(.white.opacity(showsUsage ? 0.16 : 0.07), in: Capsule())
                             .contentShape(Capsule())
+                            .layoutProbe("header.usage", row: "header", inside: "island", contains: "plan.gauge")
                     }
                     .buttonStyle(.plain)
                     .help("Лимиты Claude: какой, сколько и когда сброс")
@@ -78,6 +81,7 @@ public struct IslandHeader: View {
                         if showsUsage {
                             PlanUsageCard(usage: usage.usage)
                                 .offset(y: 28)
+                                .layoutProbe("plan.card", inside: "island")
                                 .onTapGesture { showsUsage = false }
                                 .transition(.opacity.combined(with: .offset(y: -4)))
                         }
@@ -87,10 +91,13 @@ public struct IslandHeader: View {
                 }
                 HeaderIcon(icon: soundOn ? "speaker.wave.2.fill" : "speaker.slash.fill",
                            help: soundOn ? "Выключить звуки" : "Включить звуки", action: toggleSound)
+                    .layoutProbe("header.sound", row: "header", inside: "island")
                 HeaderIcon(icon: "gearshape.fill", help: updateAvailable ? "Настройки · есть новая версия Mely" : "Настройки",
                            dot: updateAvailable, action: openSettings)
+                    .layoutProbe("header.settings", row: "header", inside: "island")
                 if !heldOpen {
                     HeaderIcon(icon: "xmark", help: "Свернуть (Esc)", action: close)
+                        .layoutProbe("header.close", row: "header", inside: "island")
                 }
             }
             .frame(maxWidth: .infinity, alignment: .trailing)

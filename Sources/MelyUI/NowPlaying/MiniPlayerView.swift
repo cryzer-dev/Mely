@@ -24,8 +24,10 @@ public struct MiniPlayerView: View {
                     .clipShape(RoundedRectangle(cornerRadius: MelyRadius.medium))
                     .contentShape(Rectangle())
                     .onTapGesture { openSource(np.sourceBundleId) }
+                    .layoutProbe("music.artwork", row: "music", inside: "content")
                 VStack(alignment: .leading, spacing: 6) {
                     Text(np.title).font(.system(size: MelyType.headline, weight: .semibold)).lineLimit(2)
+                        .layoutProbe("music.title", inside: "music.info")
                     if let artist = np.artist {
                         Text(artist).font(.system(size: MelyType.body)).foregroundStyle(.white.opacity(MelyInk.strong)).lineLimit(1)
                     }
@@ -46,17 +48,20 @@ public struct MiniPlayerView: View {
                                 size: 22, enabled: true) { send(.togglePlayPause) }
                         control("forward.fill", "Следующий", enabled: !np.prohibitsSkip) { send(.next) }
                     }
+                    .layoutProbe("music.controls", inside: "music.info")
                     .frame(maxWidth: .infinity)
                 }
                 // As tall as the cover: the controls sit by it, not at the island's bottom.
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .frame(height: Self.artwork)
+                .layoutProbe("music.info", row: "music", inside: "content")
             }
             .islandPart()
             .foregroundStyle(.white)
             .frame(maxHeight: .infinity, alignment: .top)
         } else {
             Text("Сейчас ничего не играет").font(.system(size: MelyType.title)).foregroundStyle(.white.opacity(MelyInk.secondary))
+                .layoutProbe("music.empty", inside: "content")
                 .islandPart()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }

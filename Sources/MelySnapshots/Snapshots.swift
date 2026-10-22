@@ -1,6 +1,7 @@
 import SwiftUI
 import MelyCore
 import MelyUI
+import MelyFixtures
 
 struct Snapshot {
     let name: String
@@ -744,44 +745,17 @@ enum Snapshots {
         }
     }
 
-    /// The expanded island as the app lays it out: the header level with the notch, the big
-    /// Mely left, the section right (tasks 7.9, 7.10).
+    /// The expanded island as the app lays it out (`Fixtures.expandedApp`) on this run's backdrop.
     @MainActor static func expandedApp<C: View>(_ tab: IslandTabs.Tab, geometry: IslandScreenGeometry? = nil,
                                                 held: Bool = false, showsUsage: Bool = false, pose: CharacterPose = .idle,
                                                 @ViewBuilder content: () -> C) -> some View {
-        let p = IslandPresentation(geometry: geometry ?? IslandScreenGeometry(screenWidth: 1512, safeAreaTop: 32,
-                                   auxiliaryLeftWidth: 660, auxiliaryRightWidth: 660, menuBarHeight: 32))
-        p.mode = .expanded
-        let body = content()
-        return IslandRootView(presentation: p, compactLeading: { EmptyView() }, compactTrailing: AnyView(EmptyView()),
-                              expanded: {
-                                  HStack(alignment: .top, spacing: 12) {
-                                      MelyStage(pose: pose).frame(width: 88).padding(.top, 2)
-                                      body
-                                  }
-                              },
-                              header: { header(selected: tab, held: held, showsUsage: showsUsage) })
-            .background(backdrop)
+        Fixtures.expandedApp(tab, geometry: geometry, held: held, showsUsage: showsUsage, pose: pose, backdrop: backdrop,
+                             content: content)
     }
 
-    /// The expanded island's header, as the app builds it (task 7.9).
     @MainActor static func header(selected: IslandTabs.Tab, held: Bool = false, showsUsage: Bool = false,
                                   updateAvailable: Bool = false) -> IslandHeader {
-        let tabs = IslandTabs()
-        tabs.selected = selected
-        let defaults = UserDefaults(suiteName: "mely-snapshots-header")!
-        defaults.removePersistentDomain(forName: "mely-snapshots-header")
-        let usage = PlanUsageStore(defaults: defaults)
-        usage.update(rateLimits: ["five_hour": ["used_percentage": 56, "resets_at": Date().timeIntervalSince1970 + 7200 + 840],
-                                  "seven_day": ["used_percentage": 86, "resets_at": Date().timeIntervalSince1970 + 3 * 86400 + 4 * 3600]])
-        return IslandHeader(tabs: tabs, items: [
-            .init(.sessions, icon: "house.fill", title: "Claude Code"),
-            .init(.chat, icon: "bubble.left.fill", title: "Чат"),
-            .init(.today, icon: "calendar", title: "Сегодня"),
-            .init(.music, icon: "music.note", title: "Музыка"),
-            .init(.messages, icon: "bell.fill", title: "Сообщения", badge: 3),
-        ], usage: usage, soundOn: true, heldOpen: held, updateAvailable: updateAvailable, showsUsage: showsUsage,
-           toggleSound: {}, openSettings: {}, close: {})
+        Fixtures.header(selected: selected, held: held, showsUsage: showsUsage, updateAvailable: updateAvailable)
     }
 
     @MainActor private static func settingsChange() -> some View {

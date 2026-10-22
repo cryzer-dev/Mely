@@ -22,6 +22,7 @@ public struct MessagesView: View {
                     Text("Здесь появятся уведомления выбранных приложений")
                         .font(.system(size: MelyType.caption)).foregroundStyle(.white.opacity(MelyInk.tertiary))
                 }
+                .layoutProbe("messages.empty", inside: "content")
                 .islandPart()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -31,15 +32,18 @@ public struct MessagesView: View {
                             ForEach(messages.items) { item in
                                 Button { open(item.id) } label: { MessageRow(item: item) }
                                     .buttonStyle(.plain)
+                                    .layoutProbe("messages.row.\(item.id)", inside: "messages.list")
                                     .help("Открыть чат в \(item.appName)")
                             }
                         }
                         .islandPart()
                     }
+                    .layoutProbe("messages.list", inside: "content", scrolls: true)
                     Button("Очистить", action: messages.clear)
                         .buttonStyle(.plain)
                         .font(.system(size: MelyType.caption, weight: .medium))
                         .foregroundStyle(.white.opacity(MelyInk.secondary))
+                        .layoutProbe("messages.clear", inside: "content")
                         .islandPart(spacing: 6)
                 }
             }

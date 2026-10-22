@@ -32,6 +32,7 @@ public struct AgendaView: View {
                         .padding(.horizontal, 14).padding(.vertical, 6)
                         .background(.white, in: Capsule())
                 }
+                .layoutProbe("agenda.off", inside: "content")
                 .islandPart()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let agenda {
@@ -48,16 +49,20 @@ public struct AgendaView: View {
                                 }
                                 .padding(.horizontal, 10).padding(.vertical, 5)
                                 .background(.white.opacity(MelyFill.card), in: RoundedRectangle(cornerRadius: MelyRadius.medium))
+                                .layoutProbe("agenda.allday.\(event.id)", inside: "agenda.list")
                             }
                             ForEach(agenda.timed) { event in
                                 EventRow(event: event, now: context.date, join: { join(event) })
+                                    .layoutProbe("agenda.event.\(event.id)", inside: "agenda.list")
                             }
                         }
                         .islandPart()
                     }
+                    .layoutProbe("agenda.list", inside: "content", scrolls: true)
                 }
             } else {
                 Text("Нет доступа к календарям").font(.system(size: MelyType.title)).foregroundStyle(.white.opacity(MelyInk.secondary))
+                    .layoutProbe("agenda.denied", inside: "content")
                     .islandPart()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -73,6 +78,7 @@ public struct AgendaView: View {
                     .font(.system(size: MelyType.footnote)).foregroundStyle(.white.opacity(MelyInk.tertiary)).lineLimit(1)
             }
         }
+        .layoutProbe("agenda.empty", inside: "content")
         .islandPart()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

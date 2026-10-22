@@ -44,9 +44,11 @@ public struct RequestCard: View {
         }
         .foregroundStyle(.white)
         .padding(12)
+        .layoutProbe("request.body", inside: "request")
         .frame(maxHeight: .infinity, alignment: .top)
         .background(.white.opacity(MelyFill.raised), in: RoundedRectangle(cornerRadius: MelyRadius.large))
         .overlay(RoundedRectangle(cornerRadius: MelyRadius.large).strokeBorder(SessionStateStyle.color(request.isQuestion ? .waitingAnswer : .waitingApproval).opacity(0.5)))
+        .layoutProbe("request", inside: "content")
     }
 }
 

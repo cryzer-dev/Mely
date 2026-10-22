@@ -13,6 +13,7 @@ struct PeekView: View {
                 title
                 Text(content.subtitle).font(.system(size: MelyType.body)).foregroundStyle(.white.opacity(MelyInk.strong)).lineLimit(2)
             }
+            .layoutProbe("peek.text", inside: "peek", checksText: true)
             Spacer(minLength: 0)
             if let action = content.actionTitle {
                 Text(action)

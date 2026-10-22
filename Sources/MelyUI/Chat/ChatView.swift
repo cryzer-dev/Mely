@@ -13,6 +13,10 @@ public struct ChatView: View {
     @State private var draft = ""
     @State private var showModels = false
     @State private var dictation = ChatDictation()
+    /// Messages have scrolled up past the top edge: it fades.
+    @State private var scrolledDown = false
+    /// The messages are scrolled to their end and stay there as they grow.
+    @State private var following = true
     @FocusState private var fieldFocused: Bool
 
     public init(conversation: ChatConversation, preferences: ChatPreferences? = nil, tabs: IslandTabs? = nil,
@@ -28,9 +32,10 @@ public struct ChatView: View {
         VStack(alignment: .leading, spacing: 6) {
             if let context = conversation.context {
                 ContextChip(context: context, dismiss: conversation.dismissContext)
+                    .layoutProbe("chat.context", inside: "content")
             }
             if conversation.messages.isEmpty {
-                placeholder.frame(maxWidth: .infinity, maxHeight: .infinity)
+                placeholder.layoutProbe("chat.placeholder", inside: "content").frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 messages
             }
@@ -59,20 +64,46 @@ public struct ChatView: View {
         ScrollViewReader { proxy in
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 6) {
-                    ForEach(conversation.messages) { message in
+                    ForEach(Array(conversation.messages.enumerated()), id: \.element.id) { index, message in
                         ChatBubble(message: message).id(message.id)
+                            .layoutProbe("chat.message.\(index)", inside: "chat.viewport")
                     }
                     Color.clear.frame(height: 1).id("end")
                 }
-                .padding(.vertical, 2)
+                .padding(.vertical, 6)
             }
+            .defaultScrollAnchor(.bottom, for: .initialOffset)
             .frame(maxHeight: .infinity)
-            // What scrolls away fades out under the top edge instead of being cut.
-            .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.08),
-                                         .init(color: .black, location: 1)], startPoint: .top, endPoint: .bottom))
-            .onChange(of: conversation.messages.last?.text) { proxy.scrollTo("end", anchor: .bottom) }
-            .onChange(of: conversation.messages.count) { withAnimation { proxy.scrollTo("end", anchor: .bottom) } }
-            .onAppear { proxy.scrollTo("end", anchor: .bottom) }
+            .layoutProbe("chat.viewport", inside: "content", scrolls: true)
+            // An answer that grows (streaming, then redrawn as Markdown) stays in sight to its
+            // last line, unless the reader has scrolled up to read something else.
+            .onScrollGeometryChange(for: ChatScroll.self) { ChatScroll($0) } action: { old, new in
+                scrolledDown = new.fromTop > 1
+                if new.size != old.size {
+                    // A size changes in several steps: whether to follow was decided before.
+                    if following { proxy.scrollTo("end", anchor: .bottom) }
+                } else {
+                    following = new.toBottom <= ChatScroll.followDistance
+                }
+            }
+            // What scrolls away fades out under the top edge instead of being cut; at the top
+            // nothing is faded.
+            .mask {
+                VStack(spacing: 0) {
+                    LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
+                        .frame(height: scrolledDown ? ChatScroll.fade : 0)
+                    Color.black
+                }
+            }
+            .overlay(alignment: .top) {
+                if scrolledDown { Color.clear.frame(height: ChatScroll.fade).layoutProbe("chat.fade") }
+            }
+            .onChange(of: conversation.messages.count) {
+                // A new question: back to the end, whatever was being read. Not animated: the
+                // offsets in between would read as the reader scrolling away.
+                following = true
+                proxy.scrollTo("end", anchor: .bottom)
+            }
         }
     }
 
@@ -92,9 +123,11 @@ public struct ChatView: View {
                 .padding(.horizontal, 7).padding(.vertical, 3)
                 .background(.white.opacity(MelyFill.raised), in: Capsule())
                 .frame(maxWidth: 170)
+                .layoutProbe("chat.attachment.\(file.id)", row: "chat.footer", inside: "content")
             }
             if let error = conversation.attachmentError ?? dictation.error {
                 Text(error).font(.system(size: MelyType.caption)).foregroundStyle(Color(red: 1, green: 0.55, blue: 0.5)).lineLimit(1)
+                    .layoutProbe("chat.error", row: "chat.footer", inside: "content")
             }
             Spacer(minLength: 6)
             if let openInClaude, !conversation.messages.isEmpty, !conversation.isStreaming {
@@ -109,6 +142,7 @@ public struct ChatView: View {
                 }
                 .buttonStyle(.plain)
                 .help("Новый чат в приложении Claude с этим разговором")
+                .layoutProbe("chat.openInClaude", row: "chat.footer", inside: "content")
             }
             if let preferences {
                 Button {
@@ -127,6 +161,7 @@ public struct ChatView: View {
                 .buttonStyle(.plain)
                 .help(preferences.route.caption)
                 .accessibilityLabel("Модель: \(preferences.model.title), \(preferences.route.caption)")
+                .layoutProbe("chat.model", row: "chat.footer", inside: "content")
                 .popover(isPresented: $showModels, arrowEdge: .bottom) {
                     ChatModelPicker(preferences: preferences, openSettings: openSettings) { showModels = false }
                         .frame(width: 300)
@@ -179,6 +214,7 @@ public struct ChatView: View {
         .padding(.horizontal, 10).padding(.vertical, 6)
         .background(.white.opacity(MelyFill.card), in: RoundedRectangle(cornerRadius: MelyRadius.large))
         .simultaneousGesture(TapGesture().onEnded { fieldFocused = true })
+        .layoutProbe("chat.input", inside: "content")
     }
 
     private func setup(_ hint: String) -> some View {
@@ -186,6 +222,7 @@ public struct ChatView: View {
             Image(systemName: "gearshape.fill").foregroundStyle(.white.opacity(MelyInk.secondary))
             Text(hint).font(.system(size: MelyType.body)).foregroundStyle(.white.opacity(MelyInk.strong))
                 .fixedSize(horizontal: false, vertical: true)
+                .layoutProbe("chat.setup.hint", inside: "chat.setup", checksText: true)
             Spacer(minLength: 4)
             Button("Настройки чата…", action: openSettings)
                 .buttonStyle(.plain)
@@ -195,6 +232,7 @@ public struct ChatView: View {
         }
         .padding(10)
         .background(.white.opacity(MelyFill.card), in: RoundedRectangle(cornerRadius: MelyRadius.medium))
+        .layoutProbe("chat.setup", inside: "content")
     }
 
     private func send() {
@@ -214,6 +252,26 @@ public struct ChatView: View {
         case .text: "doc.text"
         }
     }
+}
+
+/// Where the messages are scrolled to.
+private struct ChatScroll: Equatable {
+    /// How far the content is scrolled up past the top edge.
+    var fromTop: CGFloat
+    /// How much content is left below the bottom edge.
+    var toBottom: CGFloat
+    /// The content's and the viewport's heights: either one moving is a resize, not a scroll.
+    var size: [CGFloat]
+
+    init(_ g: ScrollGeometry) {
+        fromTop = g.visibleRect.minY
+        toBottom = max(0, g.contentSize.height - g.visibleRect.maxY)
+        size = [g.contentSize.height, g.containerSize.height]
+    }
+
+    /// Within this of the end the chat keeps following the answer.
+    static let followDistance: CGFloat = 24
+    static let fade: CGFloat = 12
 }
 
 enum ChatStyle {

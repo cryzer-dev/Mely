@@ -23,8 +23,12 @@ let package = Package(
         // Hook relay called by Claude Code; must stay tiny and never block.
         .executableTarget(name: "NCHook", dependencies: ["MelyCore"]),
         // Renders UI states to PNG (stands in for SwiftUI Previews without Xcode).
-        .executableTarget(name: "MelySnapshots", dependencies: ["MelyCore", "MelyUI"]),
+        .executableTarget(name: "MelySnapshots", dependencies: ["MelyCore", "MelyUI", "MelyFixtures"]),
+        // Sample data and the layout variants, shared by the snapshots and the layout checks.
+        .target(name: "MelyFixtures", dependencies: ["MelyCore", "MelyUI"]),
         // Run with scripts/test.sh: it adds the Swift Testing paths the Command Line Tools need.
         .testTarget(name: "MelyCoreTests", dependencies: ["MelyCore"]),
+        // Layout checks: every variant of the island laid out offscreen, its probes checked.
+        .testTarget(name: "MelyUITests", dependencies: ["MelyCore", "MelyUI", "MelyFixtures"]),
     ]
 )

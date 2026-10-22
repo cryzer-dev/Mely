@@ -43,6 +43,7 @@ public struct IslandRootView<Compact: View, Expanded: View, Header: View>: View 
                         }
                     }
                     .frame(width: size.width, height: size.height)
+                    .layoutProbe("island")
 
                 switch presentation.mode {
                 case .hidden:
@@ -54,9 +55,13 @@ public struct IslandRootView<Compact: View, Expanded: View, Header: View>: View 
                         compactLeading
                             .environment(\.islandCharacterSize, layout.characterDiameter)
                             .frame(height: layout.characterDiameter)
+                            .layoutProbe("compact.leading", row: "compact", inside: "island")
                             .frame(width: IslandPresentation.compactSideWidth, alignment: .center)
                         Spacer(minLength: presentation.geometry.width)
+                            .frame(maxHeight: .infinity)
+                            .layoutProbe("compact.notch", row: "compact")
                         compactTrailing
+                            .layoutProbe("compact.trailing", row: "compact", inside: "island")
                             .frame(width: IslandPresentation.compactSideWidth, alignment: .center)
                     }
                     .padding(.horizontal, ear)
@@ -65,6 +70,7 @@ public struct IslandRootView<Compact: View, Expanded: View, Header: View>: View 
                 case .peek:
                     if let peek = presentation.peek {
                         PeekView(content: peek, dismiss: presentation.dismissPeek)
+                            .layoutProbe("peek", inside: "island")
                             .padding(.top, presentation.geometry.height)
                             .padding(.horizontal, 16)
                             .frame(width: size.width, height: size.height, alignment: .top)
@@ -81,12 +87,14 @@ public struct IslandRootView<Compact: View, Expanded: View, Header: View>: View 
                         header
                             .environment(\.islandNotchWidth, presentation.geometry.width + 16)
                             .frame(height: max(28, presentation.geometry.height))
+                            .layoutProbe("header", inside: "island")
                             // The limits card opens over the content below.
                             .zIndex(1)
                         expanded
                             .padding(.top, 8)
                             .padding([.horizontal, .bottom], 20)
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                            .layoutProbe("content", inside: "island")
                             .onPreferenceChange(IslandContentHeightKey.self) { height in
                                 MainActor.assumeIsolated { presentation.contentHeight = height }
                             }

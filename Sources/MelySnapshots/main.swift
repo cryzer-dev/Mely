@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import MelyUI
+import MelyFixtures
 
 /// Renders UI states to PNG files in ./snapshots (or the directory given as the first argument).
 /// Uses a real NSHostingView in an offscreen window: ImageRenderer leaves AppKit-backed
@@ -78,6 +79,27 @@ if CommandLine.arguments.dropFirst().first == "--readme" {
         for snapshot in Snapshots.readme { try render(snapshot, into: dir) }
     }
     exit(0)
+}
+
+/// `mely-snapshots --matrix <dir>`: every layout variant the checks run (openspec island-layout),
+/// as `<page>_<screen>_<data>.png`.
+if CommandLine.arguments.dropFirst().first == "--matrix" {
+    let dir = URL(fileURLWithPath: CommandLine.arguments.count > 2 ? CommandLine.arguments[2] : "snapshots/matrix", isDirectory: true)
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    // Async (the harness awaits the layout settling); the run loop below drives it.
+    Task { @MainActor in
+        for variant in LayoutMatrix.all {
+            guard let png = await LayoutHarness.lay(variant).png() else {
+                print("render failed: \(variant.name)")
+                exit(1)
+            }
+            try png.write(to: dir.appendingPathComponent("\(variant.name).png"))
+        }
+        print("matrix \(dir.path)")
+        exit(0)
+    }
+    _ = NSApplication.shared
+    RunLoop.main.run()
 }
 
 let outDir = URL(fileURLWithPath: CommandLine.arguments.dropFirst().first ?? "snapshots", isDirectory: true)

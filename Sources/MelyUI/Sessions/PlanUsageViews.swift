@@ -24,14 +24,18 @@ public struct PlanUsageGauge: View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
             if let usage = usage?.current(now: context.date) {
                 HStack(spacing: 12) {
-                    if let w = usage.fiveHour { window("5 ч", w, now: context.date) }
-                    if let w = usage.sevenDay { window("Неделя", w, now: context.date) }
-                    // Old values are shown with their age, not as live.
+                    if let w = usage.fiveHour { window("5 ч", w, now: context.date).fixedSize() }
+                    if let w = usage.sevenDay { window("Неделя", w, now: context.date).fixedSize() }
+                    // Old values are shown with their age, not as live. One line: wrapped, it
+                    // would break the bar under the sessions (no agent, no fresh numbers).
                     if context.date.timeIntervalSince(usage.updatedAt) > 15 * 60 {
                         Text("обновлено \(PlanUsage.countdown(to: context.date, from: usage.updatedAt)) назад")
                             .font(.system(size: MelyType.caption)).foregroundStyle(.white.opacity(MelyInk.tertiary))
+                            .lineLimit(1).truncationMode(.tail)
+                            .layoutPriority(-1)
                     }
                 }
+                .layoutProbe("plan.overview", inside: "sessions.usage")
             } else {
                 Text("Лимиты: нет данных").font(.system(size: MelyType.footnote)).foregroundStyle(.white.opacity(MelyInk.tertiary))
             }
@@ -91,6 +95,7 @@ public struct CompactPlanGauge: View {
                         .monospacedDigit()
                         .foregroundStyle(color)
                 }
+                .layoutProbe("plan.gauge")
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(Self.label(kind, w, now: context.date))
                 .help(Self.label(kind, w, now: context.date))

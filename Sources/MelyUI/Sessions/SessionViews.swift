@@ -117,10 +117,12 @@ public struct SessionRow: View {
                 .padding(.horizontal, 10).padding(.vertical, 5)
                 .background(.white.opacity(MelyFill.selected), in: Capsule())
                 .accessibilityLabel("Открыть \(session.projectName) в \(session.host.name)")
+                .layoutProbe("session.open.\(session.id)", inside: "session.row.\(session.id)")
         }
         .foregroundStyle(.white)
         .padding(.horizontal, 12).padding(.vertical, 8)
         .background(.white.opacity(MelyFill.card), in: RoundedRectangle(cornerRadius: MelyRadius.large))
+        .layoutProbe("session.row.\(session.id)", inside: "sessions.list")
     }
 
     private var detail: String {
@@ -158,6 +160,7 @@ public struct SessionsOverview: View {
             if store.sessions.isEmpty {
                 Text("Нет активных сессий").font(.system(size: MelyType.title)).foregroundStyle(.white.opacity(MelyInk.secondary))
                     .frame(maxWidth: .infinity, alignment: .center).padding(.vertical, 20)
+                    .layoutProbe("sessions.empty", inside: "content")
                     .islandPart()
             } else {
                 ScrollView {
@@ -171,6 +174,7 @@ public struct SessionsOverview: View {
                                                value: Self.listHeight(rows: geo.size.height, count: store.sessions.count))
                     })
                 }
+                .layoutProbe("sessions.list", inside: "content", scrolls: true)
             }
             // The header only has room for a ring: here, which limit, how much and when.
             if !showsHeader, let usage {
@@ -182,6 +186,7 @@ public struct SessionsOverview: View {
                 }
                 .padding(.horizontal, 10).padding(.vertical, 7)
                 .background(.white.opacity(MelyFill.card), in: RoundedRectangle(cornerRadius: MelyRadius.medium))
+                .layoutProbe("sessions.usage", inside: "content")
                 // The stack's spacing twice: before the spacer and after it.
                 .islandPart(spacing: 16)
             }

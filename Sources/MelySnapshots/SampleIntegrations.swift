@@ -38,39 +38,3 @@ func sampleRegistry() -> IntegrationRegistry {
     registry.showExperimental = true
     return registry
 }
-
-/// A responder nobody listens to, for cards in snapshots.
-enum SampleResponder {
-    static func make() -> HookResponder {
-        var fds: [Int32] = [0, 0]
-        socketpair(AF_UNIX, SOCK_STREAM, 0, &fds)
-        return HookResponder(fd: fds[0])
-    }
-}
-
-/// Answers every question with the same Markdown, as a stream would.
-struct SampleChatTransport: ChatTransport {
-    static let answer = """
-        Скорее всего, скидка считается **до** округления. Поправить можно так:
-
-        1. Округлять цену позиции в `CartItem.total`
-        2. Скидку применять к сумме корзины
-
-        ```ts
-        const total = round(items.reduce((s, i) => s + i.total, 0) * (1 - discount))
-        ```
-        """
-
-    func stream(apiKey: String, model: ChatModel, history: [ChatTurn]) -> AsyncThrowingStream<SSEEvent, Error> {
-        func event(_ obj: [String: Any]) -> SSEEvent {
-            SSEEvent(event: obj["type"] as? String ?? "",
-                     data: String(decoding: try! JSONSerialization.data(withJSONObject: obj), as: UTF8.self))
-        }
-        return AsyncThrowingStream { c in
-            c.yield(event(["type": "content_block_start", "index": 0, "content_block": ["type": "text", "text": Self.answer]]))
-            c.yield(event(["type": "message_delta", "delta": ["stop_reason": "end_turn"]]))
-            c.yield(event(["type": "message_stop"]))
-            c.finish()
-        }
-    }
-}
