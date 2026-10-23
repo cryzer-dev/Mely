@@ -57,6 +57,17 @@ public struct PlanUsage: Equatable, Codable, Sendable {
 
     public var isWarning: Bool { fiveHour?.isWarning == true || sevenDay?.isWarning == true }
 
+    /// Past this, the numbers are shown as old, with their age.
+    public static let staleAfter: TimeInterval = 15 * 60
+
+    /// No statusLine call for a while: the numbers may have moved since.
+    public func isStale(now: Date = Date()) -> Bool { now.timeIntervalSince(updatedAt) > Self.staleAfter }
+
+    /// "обновлено 2 ч 5 мин назад": how old the numbers are.
+    public func ageText(now: Date = Date()) -> String {
+        "обновлено \(Self.countdown(to: now, from: updatedAt)) назад"
+    }
+
     public enum Kind: Sendable {
         case fiveHour, sevenDay
 

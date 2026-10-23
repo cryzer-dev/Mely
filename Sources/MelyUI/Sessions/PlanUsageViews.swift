@@ -23,18 +23,15 @@ public struct PlanUsageGauge: View {
         // Countdowns move; a minute is precise enough.
         TimelineView(.periodic(from: .now, by: 30)) { context in
             if let usage = usage?.current(now: context.date) {
+                // Old values are dimmed, not labelled: the age does not fit the bar, so it is
+                // in the tooltip and spelled out in the card.
+                let stale = usage.isStale(now: context.date)
                 HStack(spacing: 12) {
                     if let w = usage.fiveHour { window("5 ч", w, now: context.date).fixedSize() }
                     if let w = usage.sevenDay { window("Неделя", w, now: context.date).fixedSize() }
-                    // Old values are shown with their age, not as live. One line: wrapped, it
-                    // would break the bar under the sessions (no agent, no fresh numbers).
-                    if context.date.timeIntervalSince(usage.updatedAt) > 15 * 60 {
-                        Text("обновлено \(PlanUsage.countdown(to: context.date, from: usage.updatedAt)) назад")
-                            .font(.system(size: MelyType.caption)).foregroundStyle(.white.opacity(MelyInk.tertiary))
-                            .lineLimit(1).truncationMode(.tail)
-                            .layoutPriority(-1)
-                    }
                 }
+                .opacity(stale ? 0.5 : 1)
+                .help(stale ? usage.ageText(now: context.date) : "")
                 .layoutProbe("plan.overview", inside: "sessions.usage")
             } else {
                 Text("Лимиты: нет данных").font(.system(size: MelyType.footnote)).foregroundStyle(.white.opacity(MelyInk.tertiary))
@@ -139,8 +136,8 @@ public struct PlanUsageCard: View {
                 if let usage = usage?.current(now: context.date), usage.fiveHour != nil || usage.sevenDay != nil {
                     if let w = usage.fiveHour { row("5 часов", w, now: context.date) }
                     if let w = usage.sevenDay { row("Неделя", w, now: context.date) }
-                    if context.date.timeIntervalSince(usage.updatedAt) > 15 * 60 {
-                        Text("обновлено \(PlanUsage.countdown(to: context.date, from: usage.updatedAt)) назад")
+                    if usage.isStale(now: context.date) {
+                        Text(usage.ageText(now: context.date))
                             .font(.system(size: MelyType.caption)).foregroundStyle(.white.opacity(MelyInk.tertiary))
                     }
                 } else {

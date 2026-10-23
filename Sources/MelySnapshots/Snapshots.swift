@@ -99,6 +99,11 @@ enum Snapshots {
             Snapshot(name: "Settings_Updates", view: AnyView(updateSettings())),
             Snapshot(name: "Messages_Tab", view: AnyView(messagesTab())),
             Snapshot(name: "PlanUsageGauge", view: AnyView(planUsage())),
+            Snapshot(name: "Sessions_StaleUsage", view: AnyView(expandedApp(.sessions, pose: .working) {
+                Fixtures.sessionsPage(Fixtures.sessions(2), usage: Fixtures.usage(.stale))
+            })),
+            Snapshot(name: "PlanUsageCard_Stale", view: AnyView(PlanUsageCard(usage: Fixtures.usage(.stale).usage)
+                .padding(20).background(.black))),
             Snapshot(name: "Chat_Answer", view: AnyView(chat(hasKey: true))),
             Snapshot(name: "Chat_NoKey", view: AnyView(chat(hasKey: false))),
             Snapshot(name: "Chat_ModelPicker", view: AnyView(modelPicker())),

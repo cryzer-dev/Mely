@@ -59,6 +59,13 @@ import Foundation
         #expect(usage(nil, 100).compactWindow?.kind == .sevenDay)
     }
 
+    @Test func oldNumbersAreStale() throws {
+        let usage = try #require(PlanUsage(rateLimits: rateLimits, now: t0))
+        #expect(!usage.isStale(now: t0.addingTimeInterval(15 * 60)))
+        #expect(usage.isStale(now: t0.addingTimeInterval(15 * 60 + 1)))
+        #expect(usage.ageText(now: t0.addingTimeInterval(2 * 3600 + 5 * 60)) == "обновлено 2 ч 5 мин назад")
+    }
+
     @Test func passedResetStartsOver() throws {
         let usage = try #require(PlanUsage(rateLimits: rateLimits, now: t0))
         let later = usage.current(now: t0.addingTimeInterval(3 * 3600))
