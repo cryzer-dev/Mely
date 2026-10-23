@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import MelyCore
 
 /// Settings → Основные (task 7.11): how the island behaves, where it lives, its sounds and
@@ -171,7 +172,8 @@ public struct GeneralSettingsView: View {
     }
 }
 
-/// Settings → Основные → Обновления: the version, its state and the buttons.
+/// Settings → Основные → Обновления, laid out as Sparkle apps on the Mac do: the icon and
+/// the version with its state, one main button, the switch, and the links to what changed.
 public struct UpdatesSection: View {
     let updates: UpdateState
 
@@ -180,35 +182,64 @@ public struct UpdatesSection: View {
     public var body: some View {
         @Bindable var updates = updates
         Section {
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
+                MelyAppIcon().frame(width: 40, height: 40)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Версия \(updates.currentVersion)").lineLimit(1).truncationMode(.middle)
-                    if !updates.statusText.isEmpty {
-                        HStack(spacing: 5) {
-                            if updates.phase == .checking { ProgressView().controlSize(.mini) }
-                            if updates.hasPendingUpdate { Circle().fill(Color.accentColor).frame(width: 7, height: 7) }
-                            Text(updates.statusText)
-                        }
-                        .font(.callout)
-                        .foregroundStyle(updates.phase == .failed ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
-                    }
+                    Text("Mely \(updates.currentVersion)").font(.headline).lineLimit(1).truncationMode(.middle)
+                    if !updates.statusText.isEmpty { status }
                 }
                 Spacer(minLength: 8)
                 if updates.hasPendingUpdate {
                     Button("Обновить", action: updates.installNow).buttonStyle(.borderedProminent)
+                } else {
+                    Button("Проверить сейчас", action: updates.checkNow).disabled(updates.phase == .checking)
                 }
-                Button("Проверить сейчас", action: updates.checkNow).disabled(updates.phase == .checking)
             }
+            .padding(.vertical, 2)
             Toggle("Проверять автоматически", isOn: $updates.checksAutomatically)
+            if let releases = updates.releasesURL {
+                HStack(spacing: 20) {
+                    if let notes = updates.notesURL(for: updates.currentVersion) {
+                        link("Что нового в \(updates.currentVersion)", notes)
+                    }
+                    link("Все версии", releases)
+                    Spacer(minLength: 0)
+                }
+            }
         } header: {
             Text("Обновления")
         } footer: {
-            HStack(spacing: 4) {
-                Text("Раз в день Mely тихо проверяет, не вышла ли новая версия.")
-                if let url = updates.releasesURL { Link("Все версии", destination: url) }
-            }
-            .foregroundStyle(.secondary)
+            Text("Раз в день Mely тихо проверяет, не вышла ли новая версия.").foregroundStyle(.secondary)
         }
+    }
+
+    /// The state with its mark: a tick, a dot for a waiting version, a warning, a spinner.
+    private var status: some View {
+        HStack(spacing: 5) {
+            switch updates.phase {
+            case .checking: ProgressView().controlSize(.mini)
+            case .upToDate: Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+            case .available: Circle().fill(Color.accentColor).frame(width: 7, height: 7)
+            case .failed: Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.red)
+            case .idle: EmptyView()
+            }
+            Text(updates.statusText)
+                .foregroundStyle(updates.phase == .failed ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+        }
+        .font(.callout)
+    }
+
+    /// Opens in the browser: the link's colour and an arrow out.
+    private func link(_ title: String, _ url: URL) -> some View {
+        Button { NSWorkspace.shared.open(url) } label: {
+            HStack(spacing: 3) {
+                Text(title)
+                Image(systemName: "arrow.up.right").font(.caption.weight(.semibold))
+            }
+        }
+        .buttonStyle(.link)
+        .pointerStyle(.link)
+        .help(url.absoluteString)
     }
 }
 

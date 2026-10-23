@@ -269,16 +269,22 @@ enum Snapshots {
 
     /// Settings → Основные → Обновления in each state, and a long local version.
     @MainActor private static func updateSettings() -> some View {
-        let phases: [(String, UpdateState.Phase)] = [("1.2.0", .upToDate), ("1.2.0", .available(version: "1.3.0")),
-                                                     ("1.2.0", .checking), ("10.20.300-dev", .failed)]
-        return VStack(spacing: 0) {
-            ForEach(Array(phases.enumerated()), id: \.offset) { _, item in
-                let state = UpdateState(currentVersion: item.0, releasesURL: URL(string: "https://github.com"))
-                let _ = { state.phase = item.1 }()
-                Form { UpdatesSection(updates: state) }.formStyle(.grouped).frame(height: 150)
+        let phases: [(String, UpdateState.Phase)] = [("1.3.0", .upToDate), ("1.3.0", .available(version: "1.4.0")),
+                                                     ("1.3.0", .checking), ("1.3.0", .idle), ("10.20.300-dev", .failed)]
+        func column(_ scheme: ColorScheme) -> some View {
+            VStack(spacing: 0) {
+                ForEach(Array(phases.enumerated()), id: \.offset) { _, item in
+                    let state = UpdateState(currentVersion: item.0,
+                                            releasesURL: URL(string: "https://github.com/cryzer-dev/Mely/releases"))
+                    let _ = { state.phase = item.1 }()
+                    Form { UpdatesSection(updates: state) }.formStyle(.grouped).frame(height: 230)
+                }
             }
+            .frame(width: 560)
+            .background(scheme == .dark ? Color(white: 0.12) : Color(white: 0.93))
+            .environment(\.colorScheme, scheme)
         }
-        .frame(width: 560)
+        return HStack(spacing: 0) { column(.light); column(.dark) }
     }
 
     /// Settings → Персонаж with the gallery, a look's options and the wardrobe (6.5, 6.10).
