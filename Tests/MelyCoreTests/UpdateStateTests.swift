@@ -17,6 +17,14 @@ import Foundation
         #expect(state.shouldAnnounce("1.3.1", defaults: d))
     }
 
+    @Test func notesOfAVersionOnReleases() {
+        let state = UpdateState(currentVersion: "1.3.0", releasesURL: URL(string: "https://github.com/cryzer-dev/Mely/releases"))
+        #expect(state.notesURL(for: "1.3.0")?.absoluteString == "https://github.com/cryzer-dev/Mely/releases/tag/v1.3.0")
+        #expect(state.notesURL(for: "1.3.0-dev") == nil)
+        #expect(state.notesURL(for: "") == nil)
+        #expect(UpdateState(currentVersion: "1.3.0").notesURL(for: "1.3.0") == nil)
+    }
+
     @Test func dotOnlyWhileAVersionWaits() {
         let state = UpdateState(currentVersion: "1.2.0")
         #expect(!state.hasPendingUpdate)

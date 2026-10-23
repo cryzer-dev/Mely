@@ -131,7 +131,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.island?.showPeek(content)
         }
         island?.onPeekAction = { [weak self] id in
-            if id.hasPrefix(Self.updatePeekPrefix) { self?.updateState.installNow() } else { self?.calendar.runPeekAction(id) }
+            guard let self else { return }
+            if id.hasPrefix(Self.updatePeekPrefix) {
+                self.updateState.installNow()
+            } else if id.hasPrefix(Self.updatedPeekPrefix) {
+                let version = String(id.dropFirst(Self.updatedPeekPrefix.count))
+                if let url = self.updateState.notesURL(for: version) { NSWorkspace.shared.open(url) }
+            } else {
+                self.calendar.runPeekAction(id)
+            }
         }
         island?.onPeekOpen = { [weak self] id in self?.notifications.openPreview(id) ?? false }
         notifications.peek = { [weak self] in self?.island?.showPeek($0) }
@@ -143,8 +151,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     static let updatePeekPrefix = "update-available-"
+    static let updatedPeekPrefix = "updated-"
 
-    /// Daily checks for a new version (Sparkle); after an update, «Обновилась до …».
+    /// Daily checks for a new version (Sparkle); after an update, «Обновилась до …» with «Что нового».
     private func startUpdates() {
         let updates = UpdateController(state: updateState)
         updates.announce = { [weak self] version in self?.announceUpdate(version) }
@@ -153,9 +162,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let version = UpdateState.justUpdated(current: AppInfo.version) {
             Task { [weak self] in
                 try? await Task.sleep(for: .seconds(GreetingView.duration + 0.5))
-                self?.island?.showPeek(PeekContent(id: "updated", symbol: "sparkles", tint: .green,
-                                                   title: "Обновилась до \(version)",
-                                                   subtitle: "Что нового — в настройках, «Все версии»"))
+                guard let self else { return }
+                let notes = self.updateState.notesURL(for: version)
+                self.island?.showPeek(PeekContent(id: Self.updatedPeekPrefix + version, symbol: "sparkles", tint: .green,
+                                                  title: "Обновилась до \(version)",
+                                                  subtitle: notes == nil ? "Новая версия установлена" : "Посмотрите, что изменилось",
+                                                  actionTitle: notes == nil ? nil : "Что нового"), for: .seconds(8))
             }
         }
     }

@@ -85,8 +85,8 @@ enum Snapshots {
                 id: "update-available-1.3.0", symbol: "arrow.down.circle.fill", tint: .green, title: "Доступна Mely 1.3.0",
                 subtitle: "Новая версия готова к установке", actionTitle: "Обновить")))),
             Snapshot(name: "Update_Done", view: AnyView(peekCard(PeekContent(
-                id: "updated", symbol: "sparkles", tint: .green, title: "Обновилась до 1.3.0",
-                subtitle: "Что нового — в настройках, «Все версии»")))),
+                id: "updated-1.3.0", symbol: "sparkles", tint: .green, title: "Обновилась до 1.3.0",
+                subtitle: "Посмотрите, что изменилось", actionTitle: "Что нового")))),
             Snapshot(name: "Update_HeaderDot", view: AnyView(
                 header(selected: .sessions, updateAvailable: true).frame(width: 760, height: 34).background(.black))),
             Snapshot(name: "Update_Pill", view: AnyView(expandedApp(.sessions, updateAvailable: true) {

@@ -40,6 +40,12 @@ public final class UpdateState {
         self.releasesURL = releasesURL
     }
 
+    /// What changed in `version`: its page on Releases. Nil for a local build.
+    public func notesURL(for version: String) -> URL? {
+        guard let releasesURL, !version.isEmpty, !version.hasSuffix("-dev") else { return nil }
+        return releasesURL.appendingPathComponent("tag").appendingPathComponent("v\(version)")
+    }
+
     /// The gear wears a dot while a found version waits.
     public var hasPendingUpdate: Bool {
         if case .available = phase { return true }

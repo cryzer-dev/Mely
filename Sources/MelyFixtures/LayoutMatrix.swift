@@ -202,6 +202,8 @@ public enum LayoutMatrix {
                                      title: "Синк по релизу и планирование следующего спринта со всей командой",
                                      subtitle: "Встреча в Телемосте", appBundleId: "ru.yandex.desktop.telemost",
                                      actionTitle: "Подключиться", until: Date().addingTimeInterval(4 * 60 + 20))),
+            ("Updated", PeekContent(id: "updated-1.3.0", symbol: "sparkles", tint: .green, title: "Обновилась до 1.3.0",
+                                    subtitle: "Посмотрите, что изменилось", actionTitle: "Что нового")),
             ("Message", PeekContent(id: "m", symbol: "bell.fill", tint: .blue, title: "Аня Смирнова",
                                     subtitle: "Созвон переносим на 15:30, ссылку кину в чат. Если не получится, давай завтра утром до стендапа, я весь день на встречах",
                                     appBundleId: "ru.keepcoder.Telegram", opensApp: true)),
