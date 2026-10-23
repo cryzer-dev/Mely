@@ -5,7 +5,7 @@ import MelyCore
 /// The "Сообщения" tab: mirrored notifications, newest first; a click opens the app.
 public struct MessagesView: View {
     let messages: MirroredMessages
-    /// Opens the notification by its id (the exact chat when possible).
+    /// Opens the app behind the notification with this id.
     let open: (Int64) -> Void
 
     public init(messages: MirroredMessages, open: @escaping (Int64) -> Void) {

@@ -66,7 +66,7 @@ final class IslandWindowController {
                 // A message preview leads to its app, as a system banner does.
                 if presentation.mode == .peek, let peek = presentation.peek, peek.opensApp,
                    let id = peek.appBundleId, let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) {
-                    // The exact chat when the owner knows how; else just the app.
+                    // The owner opens it and marks it read; else just the app.
                     if self?.onPeekOpen?(peek.id) != true {
                         NSWorkspace.shared.openApplication(at: url, configuration: .init(), completionHandler: nil)
                     }

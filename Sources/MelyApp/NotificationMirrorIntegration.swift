@@ -87,11 +87,11 @@ final class NotificationMirrorIntegration: Integration {
         pruneTimer = t
     }
 
-    /// Opens the chat behind a notification (list row or preview) and drops it: read.
+    /// Opens the app behind a notification (list row or preview) and drops it: read.
     func open(id: Int64) {
         guard let item = messages?.items.first(where: { $0.id == id }) else { return }
         messages?.remove(id)
-        NotificationOpener.open(uuid: item.uuid, bundleId: item.bundleId)
+        NotificationOpener.open(bundleId: item.bundleId)
     }
 
     /// The preview under the notch was clicked: its id is "notification-<rec_id>".

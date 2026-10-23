@@ -5,8 +5,7 @@ import SQLite3
 public struct MirroredNotification: Identifiable, Equatable, Sendable {
     /// `record.rec_id`: grows with every new notification.
     public let id: Int64
-    /// Matches the notification's AXIdentifier in Notification Center: pressing that
-    /// element opens the exact chat, as clicking the banner would.
+    /// The notification's identifier in Notification Center (its AXIdentifier there).
     public let uuid: String?
     public let bundleId: String
     public let title: String?
