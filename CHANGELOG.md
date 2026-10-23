@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.4.0](https://github.com/cryzer-dev/Mely/compare/v1.3.0...v1.4.0) (2026-10-23)
+
+
+### Новое
+
+* Добавлена кнопка «Что нового» после обновления ([944eb8d](https://github.com/cryzer-dev/Mely/commit/944eb8d989ae6acfdbf71cf0c3221e2c15431f78))
+* Добавлена плашка «Обновить» под Мели, пока новая версия не установлена ([d847766](https://github.com/cryzer-dev/Mely/commit/d847766180ff51b5e2f8b965001cd7b6d700d09c))
+* Напоминание о событии висит до закрытия или конца события ([bf884c4](https://github.com/cryzer-dev/Mely/commit/bf884c44bafda85a01d1ee5c2103c8920d971e50))
+* Переделан блок «Обновления» в настройках ([4461202](https://github.com/cryzer-dev/Mely/commit/4461202d1967a7cea2ead5954264a7bdcc15e942))
+
+
+### Исправления
+
+* Время напоминании видно целиком, картинка календаря с реальным днём ([8905349](https://github.com/cryzer-dev/Mely/commit/8905349096a2f7341b7faa56ad40d3d17e7beac9))
+* Клик по уведомлению сразу открывает приложение ([7ba15fe](https://github.com/cryzer-dev/Mely/commit/7ba15fe7310e5040f7f36ce6336e9b50ca8b8d5b))
+* Убрано обрезанное «обновлено…» из полоски лимитов ([86cfaa9](https://github.com/cryzer-dev/Mely/commit/86cfaa9dc0550672622a60c16938f31272ca89e9))
+
 ## [1.3.0](https://github.com/cryzer-dev/Mely/compare/v1.2.0...v1.3.0) (2026-10-22)
 
 
