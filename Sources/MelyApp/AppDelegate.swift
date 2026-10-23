@@ -60,9 +60,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             },
             compactTrailing: AnyView(CompactSessionStatus(store: store, usage: sessions.usage, music: nowPlaying.model)),
-            expanded: { [chat, notifications, calendar, nowPlaying, tabs] in
+            expanded: { [chat, notifications, calendar, nowPlaying, tabs, updateState] in
                 WithCharacter(settings: character, desktop: desktop) { ExpandedIsland(sessions: sessions, chat: chat, notifications: notifications, calendar: calendar,
-                               nowPlaying: nowPlaying, tabs: tabs,
+                               nowPlaying: nowPlaying, tabs: tabs, updates: updateState,
                                enableCalendar: { [weak self] in
                                    guard let self else { return }
                                    Task { await self.registry.setEnabled("calendar", true) }
@@ -301,15 +301,17 @@ private struct ExpandedIsland: View {
     let calendar: CalendarIntegration
     let nowPlaying: NowPlayingIntegration
     let tabs: IslandTabs
+    let updates: UpdateState
     /// Switches the calendar integration on (macOS then asks for calendar access).
     let enableCalendar: () -> Void
 
     var body: some View {
-        // Mely big on the left; in the chat it reacts to the answer.
+        // Mely big on the left; in the chat it reacts to the answer. A waiting version: «Обновить» under it.
         HStack(alignment: .top, spacing: 12) {
             LivePose(sessions: sessions, nowPlaying: nowPlaying) { pose in
                 ChatAwarePose(conversation: tabs.selected == .chat ? chat.conversation : nil, fallback: pose)
             }
+            .updatePill(updates.pendingVersion, action: updates.installNow)
             .frame(width: 88)
             .padding(.top, 14)
             content

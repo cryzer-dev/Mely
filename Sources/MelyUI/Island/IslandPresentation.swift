@@ -30,6 +30,8 @@ public final class IslandPresentation {
     public var contentHeight: CGFloat?
     /// Never shorter than the big Mely on the left.
     public static let minContentHeight: CGFloat = 120
+    /// How low the left column reaches («Обновить» under Mely); 0: just Mely.
+    public var columnHeight: CGFloat = 0
     /// Width added on each side of the notch in compact mode (character left, status right).
     public static let compactSideWidth: CGFloat = 84
     /// Concave ears that blend the island into the menu bar.
@@ -60,7 +62,7 @@ public final class IslandPresentation {
     var expandedHeight: CGFloat {
         guard let contentHeight else { return Self.expandedSize.height }
         let header = max(28, geometry.height)
-        return min(Self.expandedSize.height, header + 8 + max(Self.minContentHeight, contentHeight) + 20)
+        return min(Self.expandedSize.height, header + 8 + max(Self.minContentHeight, columnHeight, contentHeight) + 20)
     }
 
     public static let peekWidth: CGFloat = 460

@@ -25,3 +25,11 @@ extension View {
         })
     }
 }
+
+/// How low the left column (Mely and what hangs under it) reaches in the page; the island
+/// is never shorter. The deepest one wins.
+struct IslandColumnHeightKey: PreferenceKey {
+    static let space = "island.page"
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}

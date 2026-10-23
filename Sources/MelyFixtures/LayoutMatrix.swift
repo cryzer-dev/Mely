@@ -50,6 +50,10 @@ public enum LayoutMatrix {
             expanded("Header_HeldUpdate", screen, .sessions, held: true, updateAvailable: true) {
                 Fixtures.sessionsPage(Fixtures.sessions(1))
             },
+            // The shortest page: «Обновить» under Mely still fits the island.
+            expanded("Header_UpdateEmpty", screen, .sessions, usage: .none, updateAvailable: true) {
+                Fixtures.sessionsPage(SessionStore())
+            },
         ]
     }
 

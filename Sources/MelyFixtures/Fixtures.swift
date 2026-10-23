@@ -37,7 +37,8 @@ public enum Fixtures {
         return IslandRootView(presentation: p, compactLeading: { EmptyView() }, compactTrailing: AnyView(EmptyView()),
                               expanded: {
                                   HStack(alignment: .top, spacing: 12) {
-                                      MelyStage(pose: pose).frame(width: 88).padding(.top, 2)
+                                      MelyStage(pose: pose).updatePill(updateAvailable ? "1.4.0" : nil) {}
+                                          .frame(width: 88).padding(.top, 2)
                                       body
                                   }
                               },

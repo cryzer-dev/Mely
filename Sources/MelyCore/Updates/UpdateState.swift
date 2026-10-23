@@ -46,6 +46,12 @@ public final class UpdateState {
         return false
     }
 
+    /// The found version not installed yet: «Обновить» under Mely.
+    public var pendingVersion: String? {
+        if case .available(let version) = phase { return version }
+        return nil
+    }
+
     /// Whether the island should tell about `version`: once per version, remembered.
     public func shouldAnnounce(_ version: String, defaults: UserDefaults = .standard) -> Bool {
         guard defaults.string(forKey: Keys.announced) != version else { return false }

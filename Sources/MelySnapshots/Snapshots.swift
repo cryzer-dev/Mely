@@ -89,6 +89,13 @@ enum Snapshots {
                 subtitle: "Что нового — в настройках, «Все версии»")))),
             Snapshot(name: "Update_HeaderDot", view: AnyView(
                 header(selected: .sessions, updateAvailable: true).frame(width: 760, height: 34).background(.black))),
+            Snapshot(name: "Update_Pill", view: AnyView(expandedApp(.sessions, updateAvailable: true) {
+                Fixtures.sessionsPage(SessionStore())
+            })),
+            Snapshot(name: "Update_PillAway", view: AnyView(expandedApp(.sessions, updateAvailable: true) {
+                Fixtures.sessionsPage(SessionStore())
+            }.environment(\.characterDrag, CharacterDrag(isAway: true, began: { _ in }, moved: { _ in }, ended: { _ in },
+                                                          callHome: {})))),
             Snapshot(name: "Settings_Updates", view: AnyView(updateSettings())),
             Snapshot(name: "Messages_Tab", view: AnyView(messagesTab())),
             Snapshot(name: "PlanUsageGauge", view: AnyView(planUsage())),
@@ -753,9 +760,10 @@ enum Snapshots {
     /// The expanded island as the app lays it out (`Fixtures.expandedApp`) on this run's backdrop.
     @MainActor static func expandedApp<C: View>(_ tab: IslandTabs.Tab, geometry: IslandScreenGeometry? = nil,
                                                 held: Bool = false, showsUsage: Bool = false, pose: CharacterPose = .idle,
+                                                updateAvailable: Bool = false,
                                                 @ViewBuilder content: () -> C) -> some View {
-        Fixtures.expandedApp(tab, geometry: geometry, held: held, showsUsage: showsUsage, pose: pose, backdrop: backdrop,
-                             content: content)
+        Fixtures.expandedApp(tab, geometry: geometry, held: held, showsUsage: showsUsage, pose: pose,
+                             updateAvailable: updateAvailable, backdrop: backdrop, content: content)
     }
 
     @MainActor static func header(selected: IslandTabs.Tab, held: Bool = false, showsUsage: Bool = false,
