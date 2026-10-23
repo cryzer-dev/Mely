@@ -78,6 +78,10 @@ enum Snapshots {
                 id: "r", symbol: "video.fill", tint: .green, title: "Синк по релизу",
                 subtitle: "Встреча в Телемост", appBundleId: "ru.yandex.desktop.telemost", actionTitle: "Подключиться",
                 until: Date().addingTimeInterval(4 * 60 + 20))))),
+            Snapshot(name: "MeetingReminder_Running", view: AnyView(peekCard(PeekContent(
+                id: "r2", symbol: "video.fill", tint: .green, title: "Груминг бэклога",
+                subtitle: "Встреча в Телемосте", appBundleId: "ru.yandex.desktop.telemost", actionTitle: "Подключиться",
+                until: Date().addingTimeInterval(-12 * 60 - 20), staysUntil: Date().addingTimeInterval(48 * 60))))),
             Snapshot(name: "MeetingJoin", view: AnyView(peekCard(PeekContent(
                 id: "j", symbol: "doc.on.clipboard", tint: .gray, title: "Ссылка на встречу скопирована",
                 subtitle: "Если Телемост не открыл встречу: Подключиться → ⌘V", appBundleId: "ru.yandex.desktop.telemost")))),

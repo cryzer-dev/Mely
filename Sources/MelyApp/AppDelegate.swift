@@ -127,9 +127,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         registry.register(nowPlaying)
         nowPlaying.peek = { [weak self] in self?.island?.showPeek($0, for: .seconds(4)) }
         calendar.peek = { [weak self] content in
-            // A meeting reminder stays until the meeting (`until`); the rest, five seconds.
+            // An event reminder stays until the event ends (`lastsUntil`); the rest, five seconds.
             self?.island?.showPeek(content)
         }
+        island?.onPeekDismiss = { [weak self] id in self?.calendar.forgetPeek(id) }
         island?.onPeekAction = { [weak self] id in
             guard let self else { return }
             if id.hasPrefix(Self.updatePeekPrefix) {

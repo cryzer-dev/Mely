@@ -184,15 +184,14 @@ public struct MeetingLink: Equatable, Sendable {
     }
 }
 
-/// The live "через 4 мин" of a meeting reminder (task 4.6): it stays until the meeting starts.
+/// The live "через 4 мин" of an event reminder (task 4.6); once the event runs, "идёт 12 мин".
 public enum MeetingCountdown {
-    /// Whole minutes left, rounded up, so "через 1 мин" lasts the whole last minute.
+    /// Whole minutes left, rounded up, so "через 1 мин" lasts the whole last minute; after
+    /// the start, whole minutes gone, with "сейчас" for the first one.
     public static func text(until start: Date, now: Date) -> String {
         let seconds = start.timeIntervalSince(now)
-        guard seconds > 0 else { return "сейчас" }
-        return "через \(Int((seconds / 60).rounded(.up))) мин"
+        if seconds > 0 { return "через \(Int((seconds / 60).rounded(.up))) мин" }
+        let gone = Int(-seconds / 60)
+        return gone < 1 ? "сейчас" : "идёт \(gone) мин"
     }
-
-    /// Whether the reminder is still worth showing.
-    public static func isActive(until start: Date, now: Date) -> Bool { now < start }
 }

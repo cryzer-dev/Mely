@@ -57,8 +57,8 @@ final class IslandWindowController {
             .onTapGesture { [weak machine, weak self, presentation] in
                 // A preview with a button: the whole preview is the button.
                 if presentation.mode == .peek, let peek = presentation.peek, peek.actionTitle != nil {
-                    if self?.lasting?.id == peek.id { self?.lasting = nil }
                     self?.onPeekAction?(peek.id)
+                    if self?.lasting?.id == peek.id { self?.endLasting() }
                     presentation.peek = nil
                     presentation.mode = machine?.state == .hidden ? .hidden : .compact
                     return
@@ -180,27 +180,31 @@ final class IslandWindowController {
     /// Opens what a message preview points at; false lets the island just open the app.
     var onPeekOpen: ((String) -> Bool)?
 
-    /// A meeting reminder (`PeekContent.until`): shown until the meeting starts, back after
+    /// An event reminder (`PeekContent.lastsUntil`): shown until the event ends, back after
     /// other previews and after the island folds, gone with «×» or «Подключиться».
     private var lasting: PeekContent?
+    /// A lasting preview is gone (closed, joined or ran out): its owner forgets it.
+    var onPeekDismiss: ((String) -> Void)?
 
     /// Puts the lasting reminder back on screen; false when there is none (or it ran out).
     @discardableResult
     private func showLastingIfAny() -> Bool {
-        guard let content = lasting, let until = content.until else { return false }
-        guard MeetingCountdown.isActive(until: until, now: Date()) else { lasting = nil; return false }
+        guard let content = lasting, let end = content.lastsUntil else { return false }
+        guard Date() < end else { endLasting(); return false }
         guard machine.state != .expanded && machine.state != .listening else { return false }
         showPeek(content)
         return true
     }
 
     /// Shows a short card under the notch, then folds back to whatever the state machine says.
-    /// Hovering keeps it; a click opens the full island. A reminder with `until` stays till then.
+    /// Hovering keeps it; a click opens the full island. A reminder stays till `lastsUntil`.
     func showPeek(_ content: PeekContent, for duration: Duration = .seconds(5)) {
         var duration = duration
-        if let until = content.until {
+        if let end = content.lastsUntil {
+            // The next meeting's reminder takes over from one still running.
+            if lasting?.id != content.id { endLasting() }
             lasting = content
-            duration = .seconds(max(1, until.timeIntervalSinceNow))
+            duration = .seconds(max(1, end.timeIntervalSinceNow))
         }
         presentation.dismissPeek = { [weak self] in self?.dismissLasting() }
         // Over a full-screen app previews stay away; a reminder comes back after it.
@@ -217,15 +221,22 @@ final class IslandWindowController {
             guard let self, !Task.isCancelled, self.presentation.mode == .peek else { return }
             // Another preview passed over a reminder: the reminder comes back.
             if self.lasting?.id != content.id, self.showLastingIfAny() { return }
-            if self.lasting?.id == content.id { self.lasting = nil }
+            if self.lasting?.id == content.id { self.endLasting() }
             self.presentation.mode = self.machine.state == .hidden ? .hidden : .compact
             self.presentation.peek = nil
         }
     }
 
+    /// The lasting reminder is over; its owner is told.
+    private func endLasting() {
+        guard let id = lasting?.id else { return }
+        lasting = nil
+        onPeekDismiss?(id)
+    }
+
     /// «×» on a reminder.
     private func dismissLasting() {
-        lasting = nil
+        endLasting()
         peekTask?.cancel()
         guard presentation.mode == .peek else { return }
         presentation.mode = machine.state == .hidden ? .hidden : .compact

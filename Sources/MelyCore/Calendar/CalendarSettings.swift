@@ -39,14 +39,13 @@ public struct ReminderSchedule: Sendable {
 
     public init() {}
 
-    /// Events whose reminder time has come: starting within `minutes`, not started more
-    /// than a minute ago, not announced yet.
+    /// Events whose reminder time has come: starting within `minutes` or already running,
+    /// not over, not announced yet. Mely started mid-meeting still reminds of it.
     public mutating func due(_ events: [CalendarEvent], minutes: Int, now: Date) -> [CalendarEvent] {
         guard minutes > 0 else { return [] }
         let lead = TimeInterval(minutes * 60)
         let due = events.filter { e in
-            !e.isAllDay && !shown.contains(e.id)
-                && e.start.timeIntervalSince(now) <= lead && now.timeIntervalSince(e.start) < 60
+            !e.isAllDay && !shown.contains(e.id) && e.start.timeIntervalSince(now) <= lead && now < e.end
         }
         shown.formUnion(due.map(\.id))
         return due

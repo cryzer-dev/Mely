@@ -134,11 +134,18 @@ final class CalendarIntegration: Integration {
         let id = "event-soon-\(event.id)"
         if let meeting = event.meeting { pendingJoins[id] = meeting }
         log.info("reminder")
-        // The title counts down by itself ("· через 4 мин") until the meeting starts.
+        // The title counts down by itself ("· через 4 мин", then "· идёт 12 мин"); it stays
+        // until «×», «Подключиться» or the event's end.
         peek?(PeekContent(id: id, symbol: "video.fill", tint: .green, title: event.title,
                           subtitle: event.meeting.map { "Встреча в \($0.service.title)" } ?? (event.location ?? Self.time(event.start)),
                           appBundleId: event.meeting?.service.appBundleId,
-                          actionTitle: event.meeting == nil ? nil : "Подключиться", until: event.start))
+                          actionTitle: event.meeting == nil ? nil : "Подключиться", until: event.start,
+                          staysUntil: event.end))
+    }
+
+    /// A reminder is gone (closed, joined, over): its join is not needed any more.
+    func forgetPeek(_ id: String) {
+        pendingJoins.removeValue(forKey: id)
     }
 
     /// The reminder's button.

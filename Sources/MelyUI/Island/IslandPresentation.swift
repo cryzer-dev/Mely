@@ -88,15 +88,23 @@ public struct PeekContent: Equatable, Sendable {
     public var actionTitle: String?
     /// A cover replaces the icon (a new track).
     public var artwork: Data?
-    /// A meeting reminder: stays until then, with a live countdown after the title and a
-    /// close button; other previews pass over it and it comes back.
+    /// An event reminder: the event's start, counted down after the title ("через 4 мин",
+    /// then "идёт 12 мин"). The preview stays, with a close button; other previews pass over
+    /// it and it comes back.
     public var until: Date?
+    /// When the reminder goes by itself (the event's end); nil: at `until`.
+    public var staysUntil: Date?
+
+    /// When a lasting preview runs out; nil for a passing one.
+    public var lastsUntil: Date? { staysUntil ?? until }
 
     public enum Tint: Sendable { case blue, green, orange, red, yellow, gray }
 
     public init(id: String, symbol: String, tint: Tint, title: String, subtitle: String, appBundleId: String? = nil,
-                opensApp: Bool = false, actionTitle: String? = nil, artwork: Data? = nil, until: Date? = nil) {
+                opensApp: Bool = false, actionTitle: String? = nil, artwork: Data? = nil, until: Date? = nil,
+                staysUntil: Date? = nil) {
         self.until = until
+        self.staysUntil = staysUntil
         self.opensApp = opensApp
         self.actionTitle = actionTitle
         self.artwork = artwork

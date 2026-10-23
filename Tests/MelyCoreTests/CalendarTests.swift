@@ -22,14 +22,15 @@ import Foundation
         #expect(empty.nextTomorrow?.title == "Планирование")
     }
 
-    @Test func reminderCountsDownUntilTheMeeting() {
+    @Test func reminderCountsDownThenCountsUp() {
         let start = Date(timeIntervalSinceReferenceDate: 10_000)
         #expect(MeetingCountdown.text(until: start, now: start.addingTimeInterval(-300)) == "через 5 мин")
         #expect(MeetingCountdown.text(until: start, now: start.addingTimeInterval(-241)) == "через 5 мин")
         #expect(MeetingCountdown.text(until: start, now: start.addingTimeInterval(-59)) == "через 1 мин")
         #expect(MeetingCountdown.text(until: start, now: start) == "сейчас")
-        #expect(MeetingCountdown.isActive(until: start, now: start.addingTimeInterval(-1)))
-        #expect(!MeetingCountdown.isActive(until: start, now: start))
+        #expect(MeetingCountdown.text(until: start, now: start.addingTimeInterval(59)) == "сейчас")
+        #expect(MeetingCountdown.text(until: start, now: start.addingTimeInterval(60)) == "идёт 1 мин")
+        #expect(MeetingCountdown.text(until: start, now: start.addingTimeInterval(40 * 60 + 30)) == "идёт 40 мин")
     }
 
     @Test func joinableMeeting() throws {
@@ -79,9 +80,19 @@ import Foundation
         #expect(schedule.due([meeting], minutes: 5, now: t0).isEmpty)                       // 10 minutes away
         #expect(schedule.due([meeting], minutes: 5, now: t0.addingTimeInterval(301)).map(\.id) == ["m"])
         #expect(schedule.due([meeting], minutes: 5, now: t0.addingTimeInterval(400)).isEmpty) // once
+        var off = ReminderSchedule()
+        #expect(off.due([meeting], minutes: 0, now: t0.addingTimeInterval(590)).isEmpty)      // reminders off
+    }
+
+    @Test func remindsOfARunningEventUntilItsEnd() {
+        let meeting = CalendarEvent(id: "m", title: "Синк", start: t0.addingTimeInterval(600), end: t0.addingTimeInterval(2400), isAllDay: false)
         var late = ReminderSchedule()
-        #expect(late.due([meeting], minutes: 5, now: t0.addingTimeInterval(700)).isEmpty)     // started long ago
-        #expect(late.due([meeting], minutes: 0, now: t0.addingTimeInterval(590)).isEmpty)     // reminders off
+        #expect(late.due([meeting], minutes: 5, now: t0.addingTimeInterval(1200)).map(\.id) == ["m"]) // Mely started mid-meeting
+        #expect(late.due([meeting], minutes: 5, now: t0.addingTimeInterval(1300)).isEmpty)           // once
+        var over = ReminderSchedule()
+        #expect(over.due([meeting], minutes: 5, now: t0.addingTimeInterval(2400)).isEmpty)          // over
+        let allDay = CalendarEvent(id: "d", title: "Дежурство", start: t0, end: t0.addingTimeInterval(86400), isAllDay: true)
+        #expect(over.due([allDay], minutes: 5, now: t0.addingTimeInterval(60)).isEmpty)
     }
 
     @MainActor @Test func settingsPersist() throws {
