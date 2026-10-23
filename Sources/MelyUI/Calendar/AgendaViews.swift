@@ -8,11 +8,14 @@ public struct AgendaView: View {
     let isOn: Bool
     let enable: () -> Void
     let join: (CalendarEvent) -> Void
+    /// A fixed clock (the README picture); nil: the real one.
+    let now: Date?
 
-    public init(agenda: Agenda?, isOn: Bool = true, enable: @escaping () -> Void = {},
+    public init(agenda: Agenda?, isOn: Bool = true, now: Date? = nil, enable: @escaping () -> Void = {},
                 join: @escaping (CalendarEvent) -> Void) {
         self.agenda = agenda
         self.isOn = isOn
+        self.now = now
         self.enable = enable
         self.join = join
     }
@@ -52,7 +55,7 @@ public struct AgendaView: View {
                                 .layoutProbe("agenda.allday.\(event.id)", inside: "agenda.list")
                             }
                             ForEach(agenda.timed) { event in
-                                EventRow(event: event, now: context.date, join: { join(event) })
+                                EventRow(event: event, now: now ?? context.date, join: { join(event) })
                                     .layoutProbe("agenda.event.\(event.id)", inside: "agenda.list")
                             }
                         }

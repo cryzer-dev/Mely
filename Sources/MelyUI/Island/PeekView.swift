@@ -13,6 +13,8 @@ struct PeekView: View {
                 title
                 Text(content.subtitle).font(.system(size: MelyType.body)).foregroundStyle(.white.opacity(MelyInk.strong)).lineLimit(2)
             }
+            // Ahead of the spacer: the title takes the room it needs before the gap does.
+            .layoutPriority(1)
             .layoutProbe("peek.text", inside: "peek", checksText: true)
             Spacer(minLength: 0)
             if let action = content.actionTitle {
@@ -41,12 +43,16 @@ struct PeekView: View {
         .frame(height: IslandPresentation.peekBodyHeight)
     }
 
-    /// The title; a reminder's counts down to its meeting.
+    /// The title; a reminder's counts down to its meeting. A long title gives way: the
+    /// countdown always shows whole.
     @ViewBuilder private var title: some View {
         if let until = content.until {
             TimelineView(.periodic(from: .now, by: 10)) { context in
-                Text(content.title + " · " + MeetingCountdown.text(until: until, now: context.date))
-                    .font(.system(size: MelyType.title, weight: .semibold)).lineLimit(1)
+                HStack(spacing: 0) {
+                    Text(content.title).lineLimit(1)
+                    Text(" · " + MeetingCountdown.text(until: until, now: context.date)).lineLimit(1).fixedSize()
+                }
+                .font(.system(size: MelyType.title, weight: .semibold))
             }
         } else {
             Text(content.title).font(.system(size: MelyType.title, weight: .semibold)).lineLimit(1)

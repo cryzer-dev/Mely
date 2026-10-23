@@ -25,7 +25,7 @@ enum Snapshots {
             Snapshot(name: "today", view: AnyView(Desk { calendarAgenda() })),
             Snapshot(name: "music", view: AnyView(Desk { miniPlayer() })),
             Snapshot(name: "reminder", view: AnyView(Desk(height: 128) { peekCard(PeekContent(
-                id: "r", symbol: "video.fill", tint: .green, title: "Синк по релизу",
+                id: "r", symbol: "video.fill", tint: .green, title: "Совещание",
                 subtitle: "Встреча в Телемосте", appBundleId: "ru.yandex.desktop.telemost", actionTitle: "Подключиться",
                 until: Date().addingTimeInterval(4 * 60 + 20))) })),
             Snapshot(name: "update", view: AnyView(Desk(height: 128) { peekCard(PeekContent(
@@ -75,8 +75,8 @@ enum Snapshots {
             Snapshot(name: "PlanUsage_Card", view: AnyView(usageCard())),
             Snapshot(name: "Island_Expanded_NoNotch", view: AnyView(expandedNoNotch())),
             Snapshot(name: "MeetingReminder", view: AnyView(peekCard(PeekContent(
-                id: "r", symbol: "video.fill", tint: .green, title: "Синк по релизу",
-                subtitle: "Встреча в Телемост", appBundleId: "ru.yandex.desktop.telemost", actionTitle: "Подключиться",
+                id: "r", symbol: "video.fill", tint: .green, title: "Совещание",
+                subtitle: "Встреча в Телемосте", appBundleId: "ru.yandex.desktop.telemost", actionTitle: "Подключиться",
                 until: Date().addingTimeInterval(4 * 60 + 20))))),
             Snapshot(name: "MeetingReminder_Running", view: AnyView(peekCard(PeekContent(
                 id: "r2", symbol: "video.fill", tint: .green, title: "Груминг бэклога",
@@ -476,28 +476,29 @@ enum Snapshots {
             .background(backdrop)
     }
 
-    /// The "Сегодня" tab mid-morning: an all-day event, one past, one running with a call.
+    /// The "Сегодня" tab at 11:49 on a working day: on duty all day, the daily done, the
+    /// grooming running, a meeting soon, lunch after. A fixed clock: the same picture every run.
     @MainActor private static func calendarAgenda() -> some View {
-        let now = Date()
-        func ev(_ id: String, _ title: String, _ from: Double, _ to: Double, allDay: Bool = false,
+        let day = Calendar.current.startOfDay(for: Date())
+        func at(_ hour: Int, _ minute: Int = 0) -> Date { day.addingTimeInterval(TimeInterval(hour * 3600 + minute * 60)) }
+        func ev(_ id: String, _ title: String, _ from: Date, _ to: Date, allDay: Bool = false,
                 location: String? = nil, meeting: MeetingLink? = nil) -> CalendarEvent {
-            CalendarEvent(id: id, title: title, start: now.addingTimeInterval(from * 60), end: now.addingTimeInterval(to * 60),
-                          isAllDay: allDay, location: location, meeting: meeting)
+            CalendarEvent(id: id, title: title, start: from, end: to, isAllDay: allDay, location: location, meeting: meeting)
         }
         let telemost = MeetingLink(service: .telemost, url: URL(string: "https://telemost.yandex.ru/j/5512")!)
         let zoom = MeetingLink(service: .zoom, url: URL(string: "https://zoom.us/j/831")!)
         let agenda = Agenda(today: [
-            ev("d", "Дежурство по релизу", -600, 800, allDay: true),
-            ev("a", "Стендап", -120, -105, meeting: telemost),
-            ev("b", "Синк по корзине", -10, 35, meeting: telemost),
-            ev("c", "Интервью фронтенд", 12, 72, meeting: zoom),
-            ev("e", "Обед", 120, 180, location: "Кафе на первом"),
+            ev("d", "Дежурство по релизу", day, at(24), allDay: true),
+            ev("a", "Дейли", at(10), at(10, 15), meeting: telemost),
+            ev("b", "Груминг бэклога", at(11), at(12), meeting: zoom),
+            ev("c", "Совещание", at(12), at(12, 30), meeting: telemost),
+            ev("e", "Обед", at(13), at(14), location: "Кафе на первом"),
         ], tomorrow: [])
         let tabs = IslandTabs()
         tabs.selected = .today
         return expandedApp(.today) {
             ClaudeOverview(store: SessionStore(), queue: ApprovalQueue(), tabs: tabs,
-                           today: AnyView(AgendaView(agenda: agenda) { _ in }),
+                           today: AnyView(AgendaView(agenda: agenda, now: at(11, 49)) { _ in }),
                            open: { _ in }, decide: { _, _ in }, answerInTerminal: { _ in })
         }
     }
