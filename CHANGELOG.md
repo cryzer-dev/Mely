@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.5.0](https://github.com/cryzer-dev/Mely/compare/v1.4.0...v1.5.0) (2026-10-27)
+
+
+### Новое
+
+* Добавлена сборка статистики ([0986a22](https://github.com/cryzer-dev/Mely/commit/0986a22a417c891dfbd0319425a1d1ac17a982ef))
+
+
+### Исправления
+
+* Добавлен евент отмены события в календаре ([6881d89](https://github.com/cryzer-dev/Mely/commit/6881d890b80ff47f4ae179e88049a0ad79bbe23d))
+* Кнопка Подключиться больше не ломает верстку ([85db43b](https://github.com/cryzer-dev/Mely/commit/85db43be73c196d5c31969ce772593b0c10ba8df))
+* Обновлена вкладка «Уведомления» ([6024cb0](https://github.com/cryzer-dev/Mely/commit/6024cb03a3b39ab8bb86cfdf6518e73ce2ead33e))
+* Ссылки на незнакомые сервисы показывают кнопку ([012129a](https://github.com/cryzer-dev/Mely/commit/012129a812ff3f66c45a0f7155ce53114323f9f7))
+
 ## [1.4.0](https://github.com/cryzer-dev/Mely/compare/v1.3.0...v1.4.0) (2026-10-23)
 
 
