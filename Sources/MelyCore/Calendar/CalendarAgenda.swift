@@ -163,9 +163,6 @@ public struct MeetingLink: Equatable, Sendable {
         return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
     }
 
-    /// The button: a known service is joined, anything else is a link to open.
-    public var actionTitle: String { service == .other ? "Открыть ссылку" : "Подключиться" }
-
     /// A known service's link in the event's url, then location, then notes; failing that,
     /// the first link of any site in the same order (a document link in the notes loses to
     /// a Telemost link below it).

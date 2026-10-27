@@ -311,11 +311,11 @@ public enum Fixtures {
         return messages
     }
 
-    public static func messagesPage(_ messages: NotificationInbox) -> some View {
+    public static func messagesPage(_ messages: NotificationInbox, hovered: String? = nil) -> some View {
         let tabs = IslandTabs()
         tabs.selected = .notifications
         return ClaudeOverview(store: SessionStore(), queue: ApprovalQueue(), tabs: tabs,
-                              notifications: AnyView(NotificationsView(inbox: messages) { _ in }),
+                              notifications: AnyView(NotificationsView(inbox: messages, hovered: hovered) { _ in }),
                               open: { _ in }, decide: { _, _ in }, answerInTerminal: { _ in })
     }
 

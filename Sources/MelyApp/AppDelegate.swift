@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let nowPlaying = NowPlayingIntegration()
     private let tabs = IslandTabs()
     private let inboxSettings = InboxSettings()
+    private let telemetry = Telemetry()
     private lazy var inbox = NotificationInbox(fileURL: inboxSettings.persists ? NotificationInbox.defaultURL : nil)
     private var chatHotKey: GlobalHotKey?
     private var sessions: ClaudeSessionsController?
@@ -30,6 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let fullScreen = FullScreenWatcher()
     private lazy var settings = SettingsWindowController(registry: registry, characters: characterSettings, behavior: behavior,
                                                          updates: updateState, peeks: nowPlaying.peeks, inbox: inboxSettings,
+                                                         telemetry: telemetry.settings,
                                                          displayChanged: { [weak self] in self?.island?.relocateToChosenScreen() })
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -63,10 +65,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             },
             compactTrailing: AnyView(CompactSessionStatus(store: store, usage: sessions.usage, music: nowPlaying.model)),
-            expanded: { [chat, notifications, calendar, nowPlaying, tabs, updateState, inbox, inboxSettings] in
+            expanded: { [chat, notifications, calendar, nowPlaying, tabs, updateState, inbox, inboxSettings, telemetry] in
                 WithCharacter(settings: character, desktop: desktop) { ExpandedIsland(sessions: sessions, chat: chat, notifications: notifications, calendar: calendar,
                                nowPlaying: nowPlaying, tabs: tabs, updates: updateState,
-                               inbox: inbox, inboxSettings: inboxSettings,
+                               inbox: inbox, inboxSettings: inboxSettings, count: { telemetry.count($0) },
                                enableCalendar: { [weak self] in
                                    guard let self else { return }
                                    Task { await self.registry.setEnabled("calendar", true) }
@@ -121,7 +123,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             island?.reveal()
         }
-        showFirstRunTips()
+        let firstRun = showFirstRunTips()
         setUpStatusItem()
         setUpEditMenu()
         registry.permissions = permissions
@@ -142,11 +144,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.island?.showPeek(content)
         }
         calendar.dismissPeek = { [weak self] id in self?.island?.dismissPeek(id) }
+        calendar.joined = { [weak self] in self?.telemetry.count(.meetingJoined) }
         island?.onPeekDismiss = { [weak self] id in self?.calendar.forgetPeek(id) }
         island?.onPeekAction = { [weak self] id in
             guard let self else { return }
             if id.hasPrefix(Self.updatePeekPrefix) {
                 self.updateState.installNow()
+            } else if id == Self.telemetryPeekId {
+                // Off, and the settings open on the switch: it is plain what happened.
+                self.telemetry.settings.isOn = false
+                self.telemetry.settings.reveal += 1
+                self.openSettings(on: .general)
             } else if id.hasPrefix(Self.updatedPeekPrefix) {
                 let version = String(id.dropFirst(Self.updatedPeekPrefix.count))
                 if let url = self.updateState.notesURL(for: version) { NSWorkspace.shared.open(url) }
@@ -160,6 +168,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         chatHotKey = GlobalHotKey { [weak self] in self?.openChat() }
         desktop.start()
         Task { await registry.startEnabled() }
+        telemetry.integrations = { [registry] in registry.enabledIds.sorted() }
+        telemetry.start()
+        if !firstRun { announceTelemetry() }
         startUpdates()
     }
 
@@ -205,7 +216,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.button?.image = MelyLogo.menuBarImage()
         let menu = NSMenu()
-        let settingsItem = NSMenuItem(title: "Настройки…", action: #selector(openSettings), keyEquivalent: ",")
+        let settingsItem = NSMenuItem(title: "Настройки…", action: #selector(openSettings as () -> Void), keyEquivalent: ",")
         settingsItem.target = self
         menu.addItem(settingsItem)
         menu.addItem(.separator())
@@ -251,9 +262,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// The very first launch (task 7.6): after the greeting, where things are.
-    private func showFirstRunTips() {
+    /// True when shown this launch.
+    @discardableResult
+    private func showFirstRunTips() -> Bool {
         let key = "firstRunTipsShown"
-        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        guard !UserDefaults.standard.bool(forKey: key) else { return false }
         UserDefaults.standard.set(true, forKey: key)
         Task { [weak self] in
             try? await Task.sleep(for: .seconds(GreetingView.duration + 1.2))
@@ -262,7 +275,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 subtitle: "⌃⌥Пробел — чат с Claude · Mely можно вытащить на стол · настройки — шестерёнка в челке"),
                 for: .seconds(10))
         }
+        return true
     }
+
+    /// Once, on a launch without the first-run tips: statistics are on; «Отключить» turns them
+    /// off and opens the settings on the switch.
+    private func announceTelemetry() {
+        guard telemetry.settings.isOn, !telemetry.settings.announced else { return }
+        telemetry.settings.announced = true
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(GreetingView.duration + 1.2))
+            self?.island?.showPeek(PeekContent(
+                id: Self.telemetryPeekId, symbol: "chart.bar.fill", tint: .blue, title: "Помогите улучшить Mely",
+                subtitle: "Mely анонимно считает, какими функциями пользуются чаще", actionTitle: "Отключить"),
+                for: .seconds(8))
+        }
+    }
+
+    static let telemetryPeekId = "telemetry-notice"
 
     /// Mely dropped on a window: a new conversation about that window.
     private func askAbout(_ app: NSRunningApplication, _ frame: CGRect) {
@@ -302,9 +332,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openSettings() {
+        openSettings(on: nil)
+    }
+
+    private func openSettings(on section: SettingsSection?) {
         settings.foldIsland = { [weak self] in self?.island?.collapseFromHeader() }
         settings.islandArea = { [weak self] in self?.island?.restingArea }
-        settings.show()
+        settings.show(section)
     }
 }
 
@@ -329,6 +363,8 @@ private struct ExpandedIsland: View {
     let updates: UpdateState
     let inbox: NotificationInbox
     let inboxSettings: InboxSettings
+    /// Usage statistics: the island opened, a tab shown.
+    let count: (UsageCounter) -> Void
     /// Switches the calendar integration on (macOS then asks for calendar access).
     let enableCalendar: () -> Void
 
@@ -342,6 +378,22 @@ private struct ExpandedIsland: View {
             .frame(width: 88)
             .padding(.top, 14)
             content
+        }
+        // Shown afresh on each opening of the island.
+        .onAppear {
+            count(.islandOpened)
+            count(.tabOpened(Self.usageTab(tabs.selected)))
+        }
+        .onChange(of: tabs.selected) { count(.tabOpened(Self.usageTab(tabs.selected))) }
+    }
+
+    static func usageTab(_ tab: IslandTabs.Tab) -> UsageCounter.Tab {
+        switch tab {
+        case .sessions: .sessions
+        case .chat: .chat
+        case .today: .today
+        case .music: .music
+        case .notifications: .notifications
         }
     }
 

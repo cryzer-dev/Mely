@@ -17,6 +17,8 @@ public struct GeneralSettingsView: View {
     let peeks: NowPlayingPeeks?
     /// What the "Уведомления" tab keeps; nil hides the section.
     let inbox: InboxSettings?
+    /// Anonymous usage statistics; nil hides the section.
+    let telemetry: TelemetrySettings?
 
     /// What the sound section can do; the app plays and finds the files.
     public struct Sounds {
@@ -60,11 +62,13 @@ public struct GeneralSettingsView: View {
     }
 
     public init(behavior: IslandBehavior, sounds: Sounds, launchAtLogin: Binding<Bool>, updates: UpdateState? = nil,
-                peeks: NowPlayingPeeks? = nil, inbox: InboxSettings? = nil, displayChanged: @escaping () -> Void) {
+                peeks: NowPlayingPeeks? = nil, inbox: InboxSettings? = nil, telemetry: TelemetrySettings? = nil,
+                displayChanged: @escaping () -> Void) {
         self.behavior = behavior
         self.updates = updates
         self.peeks = peeks
         self.inbox = inbox
+        self.telemetry = telemetry
         self.sounds = sounds
         self.launchAtLogin = launchAtLogin
         self.displayChanged = displayChanged
@@ -72,8 +76,26 @@ public struct GeneralSettingsView: View {
     }
 
     public var body: some View {
+        ScrollViewReader { proxy in
+            form
+                // «Отключить» under the notch: the switch it just turned off comes into view.
+                .onAppear { revealTelemetry(proxy) }
+                .onChange(of: telemetry?.reveal) { revealTelemetry(proxy) }
+        }
+    }
+
+    private func revealTelemetry(_ proxy: ScrollViewProxy) {
+        guard let telemetry, telemetry.reveal > 0 else { return }
+        telemetry.reveal = 0
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(150))
+            withAnimation { proxy.scrollTo(TelemetrySection.id, anchor: .center) }
+        }
+    }
+
+    private var form: some View {
         @Bindable var behavior = behavior
-        Form {
+        return Form {
             Section {
                 // «Панель» — the open island with tabs; «полоска выреза» — Mely and the status
                 // beside the notch. Each setting says under it what it does.
@@ -171,6 +193,7 @@ public struct GeneralSettingsView: View {
             }
 
             if let updates { UpdatesSection(updates: updates) }
+            if let telemetry { TelemetrySection(settings: telemetry).id(TelemetrySection.id) }
         }
         .formStyle(.grouped)
     }
@@ -271,6 +294,27 @@ public struct ShortcutsSettingsView: View {
                 .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
                 .frame(width: 110, alignment: .leading)
             Text(what)
+        }
+    }
+}
+
+/// Settings → Основные → Статистика: what is sent, and the switch.
+struct TelemetrySection: View {
+    static let id = "telemetry"
+    let settings: TelemetrySettings
+
+    var body: some View {
+        @Bindable var settings = settings
+        Section {
+            Toggle(isOn: $settings.isOn) {
+                Text("Отправлять анонимную статистику")
+                Text("Раз в день: какие интеграции включены и сколько раз открывали челку, вкладки и подключались к встречам. При запуске — версии Mely и macOS")
+            }
+        } header: {
+            Text("Статистика")
+        } footer: {
+            Text("Никаких текстов, названий встреч, ссылок, проектов и путей. Помогает понять, что в Mely нужно, а что нет.")
+                .foregroundStyle(.secondary)
         }
     }
 }

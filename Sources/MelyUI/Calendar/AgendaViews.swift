@@ -122,9 +122,9 @@ private struct EventRow: View {
                     .fixedSize()
                     .layoutProbe("agenda.event.\(event.id).countdown", inside: "agenda.event.\(event.id)", checksWhole: true)
             }
-            if let meeting = event.meeting, !isPast {
+            if event.meeting != nil, !isPast {
                 // Never squeezed: the title gives way instead.
-                Button(meeting.actionTitle, action: join)
+                Button("Подключиться", action: join)
                     .buttonStyle(.plain)
                     .lineLimit(1)
                     .fixedSize()

@@ -14,6 +14,7 @@ final class SettingsWindowController {
     private let updates: UpdateState
     private let peeks: NowPlayingPeeks
     private let inbox: InboxSettings
+    private let telemetry: TelemetrySettings
     private let displayChanged: () -> Void
     /// The island: folded before the window shows, and the window kept below it (its screen
     /// and the lowest edge the window's top may reach).
@@ -21,13 +22,15 @@ final class SettingsWindowController {
     var islandArea: () -> (screen: NSScreen, bottom: CGFloat)? = { nil }
 
     init(registry: IntegrationRegistry, characters: CharacterSettings, behavior: IslandBehavior, updates: UpdateState,
-         peeks: NowPlayingPeeks, inbox: InboxSettings, displayChanged: @escaping () -> Void) {
+         peeks: NowPlayingPeeks, inbox: InboxSettings, telemetry: TelemetrySettings,
+         displayChanged: @escaping () -> Void) {
         self.registry = registry
         self.characters = characters
         self.behavior = behavior
         self.updates = updates
         self.peeks = peeks
         self.inbox = inbox
+        self.telemetry = telemetry
         self.displayChanged = displayChanged
     }
 
@@ -35,7 +38,8 @@ final class SettingsWindowController {
         if let section { UserDefaults.standard.set(section.rawValue, forKey: SettingsSection.defaultsKey) }
         if window == nil {
             let view = SettingsRoot(registry: registry, characters: characters, behavior: behavior,
-                                    updates: updates, peeks: peeks, inbox: inbox, displayChanged: displayChanged)
+                                    updates: updates, peeks: peeks, inbox: inbox, telemetry: telemetry,
+                                    displayChanged: displayChanged)
                 .frame(minWidth: 720, minHeight: 560)
             let window = NSWindow(contentViewController: NSHostingController(rootView: view))
             window.title = "Настройки \(AppInfo.name)"
@@ -105,6 +109,7 @@ private struct SettingsRoot: View {
     let updates: UpdateState
     let peeks: NowPlayingPeeks
     let inbox: InboxSettings
+    let telemetry: TelemetrySettings
     let displayChanged: () -> Void
     @AppStorage(SettingsSection.defaultsKey) private var selected: SettingsSection = .general
     @State private var launchAtLogin = LoginItem.isOn
@@ -155,6 +160,7 @@ private struct SettingsRoot: View {
                 updates: updates,
                 peeks: peeks,
                 inbox: inbox,
+                telemetry: telemetry,
                 displayChanged: displayChanged)
         case .character:
             CharacterSettingsView(settings: characters)

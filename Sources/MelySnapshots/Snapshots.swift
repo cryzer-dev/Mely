@@ -269,8 +269,9 @@ enum Snapshots {
                                    sounds: .init(test: {}, openFolder: {}, reload: { 2 }, customized: 2),
                                    launchAtLogin: .constant(true), peeks: Fixtures.peeks(),
                                    inbox: InboxSettings(defaults: UserDefaults(suiteName: "mely-snapshots-inbox")!),
+                                   telemetry: TelemetrySettings(defaults: UserDefaults(suiteName: "mely-snapshots-telemetry")!),
                                    displayChanged: {})
-            .frame(width: 560, height: 1180)
+            .frame(width: 560, height: 1760)
     }
 
     /// Settings → Основные → Обновления in each state, and a long local version.

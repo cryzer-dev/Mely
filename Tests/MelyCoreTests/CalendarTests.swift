@@ -101,7 +101,6 @@ import Foundation
         #expect(jitsi?.service == .other)
         #expect(jitsi?.url.absoluteString == "https://meet.jit.si/retro-team")
         #expect(jitsi?.name == "meet.jit.si")
-        #expect(jitsi?.actionTitle == "Открыть ссылку")
         #expect(MeetingLink.find(url: nil, location: "Переговорка", notes: "Звонок: https://ktalk.ru/abc")?.url.host == "ktalk.ru")
         // The url field first, then the location, then the notes.
         #expect(MeetingLink.find(url: URL(string: "https://www.webinar.example.ru/room"), location: "https://a.example.com",
@@ -110,7 +109,6 @@ import Foundation
         let known = MeetingLink.find(url: nil, location: nil,
                                      notes: "Документ: https://docs.example.com/plan\nhttps://telemost.yandex.ru/j/55")
         #expect(known?.service == .telemost)
-        #expect(known?.actionTitle == "Подключиться")
         // The event's own page in the calendar is not a call.
         #expect(MeetingLink.find(url: URL(string: "https://calendar.yandex.ru/event?event_id=1"), location: nil, notes: nil) == nil)
         #expect(MeetingLink.find(url: nil, location: "офис", notes: "без ссылки") == nil)

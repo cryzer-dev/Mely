@@ -166,6 +166,10 @@ public enum LayoutMatrix {
             expanded("Notifications_CalendarLong", screen, .notifications) {
                 Fixtures.messagesPage(Fixtures.messages(1, long: true, calendar: true))
             },
+            // «×» over the time of the row under the pointer, long title beside it.
+            expanded("Notifications_Hover", screen, .notifications) {
+                Fixtures.messagesPage(Fixtures.messages(1, long: true, calendar: true), hovered: "cal-moved")
+            },
             expanded("Notifications_Overflow", screen, .notifications) { Fixtures.messagesPage(Fixtures.messages(30, long: true)) },
         ]
     }
@@ -218,10 +222,13 @@ public enum LayoutMatrix {
             ("ReminderLink", PeekContent(id: "rl", symbol: "video.fill", tint: .green,
                                          title: "Shared.Пополнение баланса — синк команды платежей",
                                          subtitle: "Встреча · meet.jit.si",
-                                         actionTitle: "Открыть ссылку", until: Date().addingTimeInterval(4 * 60 + 20))),
+                                         actionTitle: "Подключиться", until: Date().addingTimeInterval(4 * 60 + 20))),
             ("Cancelled", PeekContent(id: "event-cancelled-g", symbol: "calendar.badge.minus", tint: .red,
                                       title: "Отменено: 14:00",
                                       subtitle: "Shared.Пополнение баланса — синк команды платежей и разбор инцидентов")),
+            ("Telemetry", PeekContent(id: "telemetry-notice", symbol: "chart.bar.fill", tint: .blue,
+                                      title: "Помогите улучшить Mely",
+                                      subtitle: "Mely анонимно считает, какими функциями пользуются чаще", actionTitle: "Отключить")),
             ("Updated", PeekContent(id: "updated-1.3.0", symbol: "sparkles", tint: .green, title: "Обновилась до 1.3.0",
                                     subtitle: "Посмотрите, что изменилось", actionTitle: "Что нового")),
             ("Message", PeekContent(id: "m", symbol: "bell.fill", tint: .blue, title: "Аня Смирнова",

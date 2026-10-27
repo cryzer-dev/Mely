@@ -7,9 +7,12 @@ import MelyCore
 public struct NotificationsView: View {
     let inbox: NotificationInbox
     let open: (NotificationInbox.Item) -> Void
+    /// The row shown as if the pointer were on it (snapshots, layout checks).
+    let hovered: String?
 
-    public init(inbox: NotificationInbox, open: @escaping (NotificationInbox.Item) -> Void) {
+    public init(inbox: NotificationInbox, hovered: String? = nil, open: @escaping (NotificationInbox.Item) -> Void) {
         self.inbox = inbox
+        self.hovered = hovered
         self.open = open
     }
 
@@ -30,10 +33,9 @@ public struct NotificationsView: View {
                     ScrollView(.vertical, showsIndicators: false) {
                         VStack(spacing: 6) {
                             ForEach(inbox.items) { item in
-                                Button { open(item) } label: { NotificationRow(item: item) }
-                                    .buttonStyle(.plain)
+                                NotificationItem(item: item, open: { open(item) }, remove: { inbox.remove(item.id) },
+                                                 hovering: item.id == hovered)
                                     .layoutProbe("notifications.row.\(item.id)", inside: "notifications.list")
-                                    .help(item.isCalendar ? "Открыть «Сегодня»" : "Открыть чат в \(item.appName)")
                             }
                         }
                         .islandPart()
@@ -55,8 +57,50 @@ public struct NotificationsView: View {
     }
 }
 
+/// A row and, while the pointer is on it, «×» over its time: removes only this one,
+/// opens nothing (Notification Center keeps its own copy).
+private struct NotificationItem: View {
+    let item: NotificationInbox.Item
+    let open: () -> Void
+    let remove: () -> Void
+    @State private var hovering: Bool
+
+    init(item: NotificationInbox.Item, open: @escaping () -> Void, remove: @escaping () -> Void, hovering: Bool = false) {
+        self.item = item
+        self.open = open
+        self.remove = remove
+        _hovering = State(initialValue: hovering)
+    }
+
+    var body: some View {
+        Button(action: open) { NotificationRow(item: item, hidesDate: hovering) }
+            .buttonStyle(.plain)
+            .help(item.isCalendar ? "Открыть «Сегодня»" : "Открыть чат в \(item.appName)")
+            .overlay(alignment: .topTrailing) {
+                if hovering {
+                    Button(action: remove) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: MelyType.caption, weight: .bold))
+                            .foregroundStyle(.white.opacity(MelyInk.secondary))
+                            .frame(width: 20, height: 20)
+                            .background(.white.opacity(MelyFill.raised), in: Circle())
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 5).padding(.trailing, 8)
+                    .layoutProbe("notifications.remove.\(item.id)", inside: "notifications.row.\(item.id)")
+                    .help("Убрать")
+                    .accessibilityLabel("Убрать уведомление")
+                }
+            }
+            .onHover { hovering = $0 }
+    }
+}
+
 private struct NotificationRow: View {
     let item: NotificationInbox.Item
+    /// «×» stands where the time is.
+    var hidesDate = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -68,6 +112,7 @@ private struct NotificationRow: View {
                     Text(item.date.formatted(.relative(presentation: .named, unitsStyle: .abbreviated)))
                         .font(.system(size: MelyType.caption)).foregroundStyle(.white.opacity(MelyInk.tertiary))
                         .fixedSize()
+                        .opacity(hidesDate ? 0 : 1)
                 }
                 Text(item.text).font(.system(size: MelyType.footnote)).foregroundStyle(.white.opacity(MelyInk.strong)).lineLimit(2)
             }

@@ -38,6 +38,8 @@ final class CalendarIntegration: Integration {
     @ObservationIgnored var inboxSettings: InboxSettings?
     /// Takes a reminder off the notch: its event was cancelled or moved.
     @ObservationIgnored var dismissPeek: ((String) -> Void)?
+    /// A meeting was joined, from wherever (usage statistics).
+    @ObservationIgnored var joined: (() -> Void)?
     /// The calendars of the last look: when they change (one hidden, an account offline),
     /// the events they take away are not cancellations.
     @ObservationIgnored private var lookedAt: Set<String> = []
@@ -182,7 +184,7 @@ final class CalendarIntegration: Integration {
                           subtitle: event.meeting.map { $0.service == .other ? "Встреча · \($0.name)" : "Встреча в \($0.name)" }
                               ?? (event.location ?? Self.time(event.start)),
                           appBundleId: event.meeting?.service.appBundleId,
-                          actionTitle: event.meeting?.actionTitle, until: event.start,
+                          actionTitle: event.meeting == nil ? nil : "Подключиться", until: event.start,
                           staysUntil: event.end))
     }
 
@@ -198,8 +200,9 @@ final class CalendarIntegration: Integration {
     }
 
     /// «Подключиться»: the service's app when installed and chosen, else the browser;
-    /// «Открыть ссылку» (a site Mely does not know): always the browser.
+    /// a site Mely does not know: always the browser.
     func join(_ link: MeetingLink) {
+        joined?()
         let workspace = NSWorkspace.shared
         guard settings.opensInApp(link.service), let id = link.service.appBundleId,
               let app = workspace.urlForApplication(withBundleIdentifier: id) else {

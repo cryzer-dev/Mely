@@ -89,8 +89,11 @@ import Foundation
     @Test func echoedValuesAreNotChoices() {
         let (settings, defaults) = fresh()
         // A control writing back what it shows changes nothing, so a season still dresses.
+        // A day out of every season: in one (Halloween from October 25) Mely wears a hat, and
+        // taking it off is a real choice.
+        let offSeason = Calendar.current.date(from: DateComponents(year: 2026, month: 6, day: 15, hour: 12))!
         settings.set("cheeks", to: .bool(true), for: "conure")
-        settings.wear(nil, in: .head, for: "mely")
+        settings.wear(nil, in: .head, for: "mely", now: offSeason)
         #expect(settings.outfit(for: "mely").chosenAt == nil)
         #expect(defaults.data(forKey: CharacterSettings.defaultsKey) == nil)
     }
