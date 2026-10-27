@@ -258,6 +258,16 @@ public enum Fixtures {
         return Agenda(today: events == 0 ? [] : today, tomorrow: [])
     }
 
+    /// One meeting with a link in 12 minutes, under a long dotted name.
+    public static func soonMeeting() -> Agenda {
+        let now = Date()
+        let telemost = MeetingLink(service: .telemost, url: URL(string: "https://telemost.yandex.ru/j/5512")!)
+        return Agenda(today: [CalendarEvent(id: "soon", title: "Shared.Пополнение баланса — синк команды платежей и разбор инцидентов",
+                                            start: now.addingTimeInterval(12 * 60 + 20), end: now.addingTimeInterval(57 * 60),
+                                            isAllDay: false, meeting: telemost)],
+                      tomorrow: [])
+    }
+
     public static func agendaPage(_ agenda: Agenda?, isOn: Bool = true) -> some View {
         let tabs = IslandTabs()
         tabs.selected = .today

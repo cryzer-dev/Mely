@@ -106,7 +106,7 @@ private struct EventRow: View {
                 .fill(isNow ? Color(red: 0.3, green: 0.8, blue: 0.45) : .white.opacity(MelyInk.faint))
                 .frame(width: 3)
             VStack(alignment: .leading, spacing: 2) {
-                Text(event.title).font(.system(size: MelyType.body, weight: .semibold)).lineLimit(1)
+                Text(event.title).font(.system(size: MelyType.body, weight: .semibold)).lineLimit(1).truncationMode(.tail)
                 if let detail = event.meeting?.service.title ?? event.location, !detail.isEmpty {
                     Text(detail).font(.system(size: MelyType.footnote)).foregroundStyle(.white.opacity(MelyInk.secondary)).lineLimit(1)
                 }
@@ -115,17 +115,24 @@ private struct EventRow: View {
             if isNow {
                 Text("сейчас").font(.system(size: MelyType.caption, weight: .semibold))
                     .foregroundStyle(Color(red: 0.3, green: 0.8, blue: 0.45))
+                    .fixedSize()
             } else if !isPast, event.start.timeIntervalSince(now) < 3600 {
                 Text("через \(max(1, Int(event.start.timeIntervalSince(now) / 60))) мин").font(.system(size: MelyType.caption))
                     .foregroundStyle(.white.opacity(MelyInk.secondary))
+                    .fixedSize()
+                    .layoutProbe("agenda.event.\(event.id).countdown", inside: "agenda.event.\(event.id)", checksWhole: true)
             }
             if event.meeting != nil, !isPast {
+                // Never squeezed: the title gives way instead.
                 Button("Подключиться", action: join)
                     .buttonStyle(.plain)
+                    .lineLimit(1)
+                    .fixedSize()
                     .font(.system(size: MelyType.footnote, weight: .semibold))
                     .foregroundStyle(.black)
                     .padding(.horizontal, 10).padding(.vertical, 5)
                     .background(.white.opacity(isNow ? 0.95 : 0.75), in: Capsule())
+                    .layoutProbe("agenda.event.\(event.id).join", inside: "agenda.event.\(event.id)", checksWhole: true)
             }
         }
         .padding(.horizontal, 10).padding(.vertical, 6)

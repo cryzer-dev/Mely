@@ -43,6 +43,12 @@ import MelyUI
         #expect(LayoutRules.text([cut, fits]).count == 1)
     }
 
+    @Test func squeezedButton() {
+        let squeezed = LayoutProbe(id: "b", frame: CGRect(x: 0, y: 0, width: 40, height: 60), idealWidth: 96)
+        let whole = LayoutProbe(id: "c", frame: CGRect(x: 0, y: 0, width: 96, height: 28), idealWidth: 96.6)
+        #expect(LayoutRules.whole([squeezed, whole]) == ["b сжат по ширине: нужно 96, есть 40"])
+    }
+
     @Test func chatAtRest() {
         let viewport = LayoutProbe(id: "chat.viewport", frame: CGRect(x: 0, y: 40, width: 400, height: 160), scrolls: true)
         let first = LayoutProbe(id: "chat.message.1", frame: CGRect(x: 0, y: 42, width: 400, height: 30))

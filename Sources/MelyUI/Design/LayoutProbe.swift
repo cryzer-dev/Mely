@@ -22,6 +22,9 @@ public struct LayoutProbe: Equatable, Sendable {
     public let rules: Rules
     /// The height the element needs at its width; larger than `frame` means cut text.
     public let idealHeight: CGFloat?
+    /// The width the element needs on one line, for what must show whole (a button, a
+    /// countdown); larger than `frame` means it was squeezed.
+    public let idealWidth: CGFloat?
 
     public var row: String? { rules.row }
     public var inside: String? { rules.inside }
@@ -29,16 +32,17 @@ public struct LayoutProbe: Equatable, Sendable {
     public var scrolls: Bool { rules.scrolls }
 
     public init(id: String, frame: CGRect, row: String? = nil, inside: String? = nil, contains: String? = nil,
-                scrolls: Bool = false, idealHeight: CGFloat? = nil) {
+                scrolls: Bool = false, idealHeight: CGFloat? = nil, idealWidth: CGFloat? = nil) {
         self.init(id: id, frame: frame, rules: Rules(row: row, inside: inside, contains: contains, scrolls: scrolls),
-                  idealHeight: idealHeight)
+                  idealHeight: idealHeight, idealWidth: idealWidth)
     }
 
-    init(id: String, frame: CGRect, rules: Rules, idealHeight: CGFloat?) {
+    init(id: String, frame: CGRect, rules: Rules, idealHeight: CGFloat?, idealWidth: CGFloat? = nil) {
         self.id = id
         self.frame = frame
         self.rules = rules
         self.idealHeight = idealHeight
+        self.idealWidth = idealWidth
     }
 
     /// The coordinate space the checked root declares.
@@ -59,6 +63,12 @@ private struct LayoutIdealKey: PreferenceKey {
     static func reduce(value: inout CGFloat?, nextValue: () -> CGFloat?) { value = nextValue() ?? value }
 }
 
+/// The one-line width of a probed element that must show whole.
+private struct LayoutWholeKey: PreferenceKey {
+    static let defaultValue: CGFloat? = nil
+    static func reduce(value: inout CGFloat?, nextValue: () -> CGFloat?) { value = nextValue() ?? value }
+}
+
 private struct LayoutProbesEnabledKey: EnvironmentKey {
     static let defaultValue = false
 }
@@ -75,11 +85,24 @@ private struct LayoutProbeModifier: ViewModifier {
     let id: String
     let rules: LayoutProbe.Rules
     let checksText: Bool
+    let checksWhole: Bool
     @Environment(\.layoutProbesEnabled) private var enabled
 
     func body(content: Content) -> some View {
         if enabled {
-            if checksText {
+            if checksWhole {
+                // A hidden copy as wide as it wants to be.
+                content
+                    .background(alignment: .leading) {
+                        content.environment(\.layoutProbesEnabled, false)
+                            .fixedSize().hidden()
+                            .background(GeometryReader { g in
+                                Color.clear.preference(key: LayoutWholeKey.self, value: g.size.width)
+                            })
+                    }
+                    .backgroundPreferenceValue(LayoutWholeKey.self) { ideal in report(ideal: nil, width: ideal) }
+                    .transformPreference(LayoutWholeKey.self) { $0 = nil }
+            } else if checksText {
                 // A hidden copy at the same width, as tall as it wants to be.
                 content
                     .background(alignment: .top) {
@@ -99,10 +122,11 @@ private struct LayoutProbeModifier: ViewModifier {
         }
     }
 
-    private func report(ideal: CGFloat?) -> some View {
+    private func report(ideal: CGFloat?, width: CGFloat? = nil) -> some View {
         GeometryReader { g in
             Color.clear.preference(key: LayoutProbeKey.self, value: [
-                LayoutProbe(id: id, frame: g.frame(in: .named(LayoutProbe.space)), rules: rules, idealHeight: ideal),
+                LayoutProbe(id: id, frame: g.frame(in: .named(LayoutProbe.space)), rules: rules, idealHeight: ideal,
+                            idealWidth: width),
             ])
         }
     }
@@ -111,8 +135,8 @@ private struct LayoutProbeModifier: ViewModifier {
 public extension View {
     /// Marks the element for the layout checks (see `LayoutProbe`); does nothing in the app.
     func layoutProbe(_ id: String, row: String? = nil, inside: String? = nil, contains: String? = nil,
-                     scrolls: Bool = false, checksText: Bool = false) -> some View {
+                     scrolls: Bool = false, checksText: Bool = false, checksWhole: Bool = false) -> some View {
         modifier(LayoutProbeModifier(id: id, rules: .init(row: row, inside: inside, contains: contains, scrolls: scrolls),
-                                     checksText: checksText))
+                                     checksText: checksText, checksWhole: checksWhole))
     }
 }

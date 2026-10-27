@@ -18,11 +18,15 @@ struct PeekView: View {
             .layoutProbe("peek.text", inside: "peek", checksText: true)
             Spacer(minLength: 0)
             if let action = content.actionTitle {
+                // Never squeezed: the title gives way instead.
                 Text(action)
+                    .lineLimit(1)
+                    .fixedSize()
                     .font(.system(size: MelyType.body, weight: .semibold))
                     .foregroundStyle(.black)
                     .padding(.horizontal, 12).padding(.vertical, 6)
                     .background(.white, in: Capsule())
+                    .layoutProbe("peek.action", inside: "peek", checksWhole: true)
                     .accessibilityAddTraits(.isButton)
             }
             if content.until != nil, let dismiss {
@@ -51,6 +55,7 @@ struct PeekView: View {
                 HStack(spacing: 0) {
                     Text(content.title).lineLimit(1)
                     Text(" · " + MeetingCountdown.text(until: until, now: context.date)).lineLimit(1).fixedSize()
+                        .layoutProbe("peek.countdown", inside: "peek", checksWhole: true)
                 }
                 .font(.system(size: MelyType.title, weight: .semibold))
             }

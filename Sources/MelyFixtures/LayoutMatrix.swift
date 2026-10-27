@@ -151,6 +151,8 @@ public enum LayoutMatrix {
             expanded("Today_Empty", screen, .today) { Fixtures.agendaPage(Fixtures.agenda(0)) },
             expanded("Today_Five", screen, .today) { Fixtures.agendaPage(Fixtures.agenda(4)) },
             expanded("Today_Overflow", screen, .today) { Fixtures.agendaPage(Fixtures.agenda(12, long: true)) },
+            // A long name next to both the countdown and «Подключиться».
+            expanded("Today_SoonLong", screen, .today) { Fixtures.agendaPage(Fixtures.soonMeeting()) },
         ]
     }
 
@@ -202,6 +204,11 @@ public enum LayoutMatrix {
                                      title: "Синк по релизу и планирование следующего спринта со всей командой",
                                      subtitle: "Встреча в Телемосте", appBundleId: "ru.yandex.desktop.telemost",
                                      actionTitle: "Подключиться", until: Date().addingTimeInterval(4 * 60 + 20))),
+            // A dotted name with no spaces to break at: «Подключиться» once gave way to it.
+            ("ReminderDotted", PeekContent(id: "rd", symbol: "video.fill", tint: .green,
+                                           title: "Shared.Пополнение баланса — синк команды платежей",
+                                           subtitle: "Встреча в Телемосте", appBundleId: "ru.yandex.desktop.telemost",
+                                           actionTitle: "Подключиться", until: Date().addingTimeInterval(4 * 60 + 20))),
             ("Updated", PeekContent(id: "updated-1.3.0", symbol: "sparkles", tint: .green, title: "Обновилась до 1.3.0",
                                     subtitle: "Посмотрите, что изменилось", actionTitle: "Что нового")),
             ("Message", PeekContent(id: "m", symbol: "bell.fill", tint: .blue, title: "Аня Смирнова",

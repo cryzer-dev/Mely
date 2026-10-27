@@ -9,7 +9,7 @@ public enum LayoutRules {
     static let tolerance: CGFloat = 0.5
 
     public static func check(_ probes: [LayoutProbe]) -> [String] {
-        inside(probes) + rows(probes) + nonEmpty(probes) + contains(probes) + text(probes)
+        inside(probes) + rows(probes) + nonEmpty(probes) + contains(probes) + text(probes) + whole(probes)
     }
 
     /// Each probe within its `inside` probe, which must be there; in a scrolling container
@@ -68,6 +68,14 @@ public enum LayoutRules {
         probes.compactMap { probe in
             guard let ideal = probe.idealHeight, ideal > probe.frame.height + 1 else { return nil }
             return "\(probe.id) обрезан по высоте: нужно \(Int(ideal.rounded())), есть \(Int(probe.frame.height.rounded()))"
+        }
+    }
+
+    /// What must show whole (a button, a countdown) gets its one-line width.
+    public static func whole(_ probes: [LayoutProbe]) -> [String] {
+        probes.compactMap { probe in
+            guard let ideal = probe.idealWidth, ideal > probe.frame.width + 1 else { return nil }
+            return "\(probe.id) сжат по ширине: нужно \(Int(ideal.rounded())), есть \(Int(probe.frame.width.rounded()))"
         }
     }
 
