@@ -141,6 +141,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // An event reminder stays until the event ends (`lastsUntil`); the rest, five seconds.
             self?.island?.showPeek(content)
         }
+        calendar.dismissPeek = { [weak self] id in self?.island?.dismissPeek(id) }
         island?.onPeekDismiss = { [weak self] id in self?.calendar.forgetPeek(id) }
         island?.onPeekAction = { [weak self] id in
             guard let self else { return }

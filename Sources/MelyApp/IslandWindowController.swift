@@ -234,6 +234,17 @@ final class IslandWindowController {
         onPeekDismiss?(id)
     }
 
+    /// The event behind a reminder was cancelled or moved: the reminder goes, whether on
+    /// screen or waiting to come back.
+    func dismissPeek(_ id: String) {
+        guard lasting?.id == id else { return }
+        endLasting()
+        guard presentation.mode == .peek, presentation.peek?.id == id else { return }
+        peekTask?.cancel()
+        presentation.mode = machine.state == .hidden ? .hidden : .compact
+        presentation.peek = nil
+    }
+
     /// «×» on a reminder.
     private func dismissLasting() {
         endLasting()

@@ -13,9 +13,11 @@ public struct CalendarEvent: Identifiable, Equatable, Sendable {
     public let calendarTitle: String
     /// The call link found in the url, location or notes.
     public let meeting: MeetingLink?
+    /// EventKit's own identifier, to look the event up once it leaves the window.
+    public let eventKitId: String?
 
     public init(id: String, title: String, start: Date, end: Date, isAllDay: Bool, location: String? = nil,
-                calendarTitle: String = "", meeting: MeetingLink? = nil) {
+                calendarTitle: String = "", meeting: MeetingLink? = nil, eventKitId: String? = nil) {
         self.id = id
         self.title = title
         self.start = start
@@ -24,6 +26,7 @@ public struct CalendarEvent: Identifiable, Equatable, Sendable {
         self.location = location
         self.calendarTitle = calendarTitle
         self.meeting = meeting
+        self.eventKitId = eventKitId
     }
 
     public func isNow(_ now: Date) -> Bool { start <= now && now < end }
@@ -66,19 +69,31 @@ public struct EventChanges: Equatable, Sendable {
 
     public let added: [CalendarEvent]
     public let moved: [Moved]
+    /// Gone from the calendars before it ended: cancelled, or moved past tomorrow (the
+    /// owner tells which by looking it up).
+    public let removed: [CalendarEvent]
 
-    public var isEmpty: Bool { added.isEmpty && moved.isEmpty }
+    public init(added: [CalendarEvent], moved: [Moved], removed: [CalendarEvent] = []) {
+        self.added = added
+        self.moved = moved
+        self.removed = removed
+    }
+
+    public var isEmpty: Bool { added.isEmpty && moved.isEmpty && removed.isEmpty }
 }
 
 public struct EventSnapshot: Sendable {
-    private var known: [String: (start: Date, end: Date)]?
+    private var known: [String: CalendarEvent]?
 
     public init() {}
 
     /// Compares `events` (today and tomorrow) with the last look and remembers them.
-    /// Event ids survive a move, so a moved event is reported as moved, not as new.
-    public mutating func update(_ events: [CalendarEvent]) -> EventChanges {
-        let current = Dictionary(events.map { ($0.id, ($0.start, $0.end)) }, uniquingKeysWith: { a, _ in a })
+    /// Event ids survive a move, so a moved event is reported as moved, not as new. An
+    /// empty look after a full one is taken for a calendar that did not answer: nothing
+    /// changes and it is not remembered.
+    public mutating func update(_ events: [CalendarEvent], now: Date = Date()) -> EventChanges {
+        if events.isEmpty, let known, !known.isEmpty { return EventChanges(added: [], moved: []) }
+        let current = Dictionary(events.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         defer { known = current }
         guard let known else { return EventChanges(added: [], moved: []) }
         var added: [CalendarEvent] = []
@@ -92,7 +107,8 @@ public struct EventSnapshot: Sendable {
                 added.append(event)
             }
         }
-        return EventChanges(added: added.sorted { $0.start < $1.start }, moved: moved)
+        let removed = known.values.filter { current[$0.id] == nil && $0.end > now }.sorted { $0.start < $1.start }
+        return EventChanges(added: added.sorted { $0.start < $1.start }, moved: moved, removed: removed)
     }
 }
 

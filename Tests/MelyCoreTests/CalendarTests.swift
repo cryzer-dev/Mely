@@ -51,6 +51,41 @@ import Foundation
         #expect(snapshot.update([ev("a", "Стендап", 10, 10.25), ev("b", "Ретро", 16, 17), ev("c", "Интервью", 12, 13)]).isEmpty)
     }
 
+    @Test func snapshotFindsCancelledEvents() {
+        var snapshot = EventSnapshot()
+        let now = at(11)
+        let all = [ev("a", "Стендап", 10, 10.25), ev("b", "Груминг", 14, 15), ev("c", "Демо", 12, 13, day: 1)]
+        _ = snapshot.update(all, now: now)
+        // Groom deleted; the stand-up is over, so its going is no news.
+        let changes = snapshot.update([ev("c", "Демо", 12, 13, day: 1)], now: now)
+        #expect(changes.removed.map(\.title) == ["Груминг"])
+        #expect(changes.removed.first?.start == at(14))
+        #expect(changes.added.isEmpty && changes.moved.isEmpty)
+        // Once told, not again.
+        #expect(snapshot.update([ev("c", "Демо", 12, 13, day: 1)], now: now).isEmpty)
+    }
+
+    @Test func emptyLookIsNotACancellation() {
+        var snapshot = EventSnapshot()
+        let now = at(11)
+        _ = snapshot.update([ev("b", "Груминг", 14, 15)], now: now)
+        // The calendar did not answer: nothing changed, and nothing is forgotten.
+        #expect(snapshot.update([], now: now).isEmpty)
+        #expect(snapshot.update([ev("b", "Груминг", 14, 15)], now: now).isEmpty)
+    }
+
+    @Test func movedEventIsRemindedAgain() {
+        let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+        let meeting = CalendarEvent(id: "m", title: "Синк", start: t0.addingTimeInterval(240), end: t0.addingTimeInterval(2400), isAllDay: false)
+        var schedule = ReminderSchedule()
+        #expect(schedule.due([meeting], minutes: 5, now: t0).map(\.id) == ["m"])
+        let moved = CalendarEvent(id: "m", title: "Синк", start: t0.addingTimeInterval(3600), end: t0.addingTimeInterval(5400), isAllDay: false)
+        #expect(schedule.due([moved], minutes: 5, now: t0.addingTimeInterval(3360)).isEmpty)   // already reminded
+        schedule.forget("m")
+        #expect(schedule.due([moved], minutes: 5, now: t0.addingTimeInterval(3000)).isEmpty)   // not yet: 10 minutes away
+        #expect(schedule.due([moved], minutes: 5, now: t0.addingTimeInterval(3360)).map(\.id) == ["m"])
+    }
+
     @Test func findsCallLinks() {
         let inNotes = MeetingLink.find(url: nil, location: "Переговорка 3",
                                        notes: "Повестка…\nСсылка: https://telemost.yandex.ru/j/5512345678 до встречи")

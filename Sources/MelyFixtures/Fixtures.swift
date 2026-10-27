@@ -301,6 +301,9 @@ public enum Fixtures {
             messages.addCalendar(eventId: "new", symbol: "calendar.badge.plus", title: "Новое событие · 16:00",
                                  text: long ? "Shared.Пополнение баланса — синк команды платежей и разбор инцидентов" : "Ревью дизайна",
                                  ends: now.addingTimeInterval(7200), date: now.addingTimeInterval(-120))
+            messages.addCalendar(eventId: "cancelled", symbol: "calendar.badge.minus", title: "Отменено: 17:00",
+                                 text: long ? "Ретро команды платежей за квартал с разбором всех инцидентов и планов" : "Ретро",
+                                 ends: now.addingTimeInterval(9000), date: now.addingTimeInterval(-60))
             messages.addCalendar(eventId: "moved", symbol: "calendar.badge.clock", title: "Перенесено: 14:00 → 15:30",
                                  text: long ? "Груминг бэклога команды корзины, оплаты и доставки на следующий спринт" : "Груминг",
                                  ends: now.addingTimeInterval(7200), date: now.addingTimeInterval(-30))

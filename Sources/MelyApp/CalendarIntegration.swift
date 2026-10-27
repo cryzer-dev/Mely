@@ -36,6 +36,11 @@ final class CalendarIntegration: Integration {
     /// The "Уведомления" tab, shared with the mirrored notifications; what of it is kept.
     @ObservationIgnored var inbox: NotificationInbox?
     @ObservationIgnored var inboxSettings: InboxSettings?
+    /// Takes a reminder off the notch: its event was cancelled or moved.
+    @ObservationIgnored var dismissPeek: ((String) -> Void)?
+    /// The calendars of the last look: when they change (one hidden, an account offline),
+    /// the events they take away are not cancellations.
+    @ObservationIgnored private var lookedAt: Set<String> = []
     /// Joins pending on a reminder's button, by preview id.
     @ObservationIgnored private var pendingJoins: [String: MeetingLink] = [:]
 
@@ -108,6 +113,11 @@ final class CalendarIntegration: Integration {
               let after = cal.date(byAdding: .day, value: 2, to: today) else { return }
         let calendars = store.calendars(for: .event).filter { !settings.hiddenCalendars.contains($0.calendarIdentifier) }
         guard !calendars.isEmpty else { agenda = Agenda(today: [], tomorrow: []); return }
+        let ids = Set(calendars.map(\.calendarIdentifier))
+        if ids != lookedAt {
+            lookedAt = ids
+            snapshot = EventSnapshot()
+        }
         let predicate = store.predicateForEvents(withStart: today, end: after, calendars: calendars)
         let events = store.events(matching: predicate).map(Self.event)
         let todays = events.filter { $0.start < tomorrow && $0.end > today }
@@ -115,13 +125,28 @@ final class CalendarIntegration: Integration {
         agenda = Agenda(today: todays, tomorrow: tomorrows)
         upcoming = events
 
-        let changes = snapshot.update(events)
-        if announce { tell(changes) }
+        let changes = snapshot.update(events, now: now)
+        let cancelled = changes.removed.filter(isCancelled)
+        // A moved event is reminded of again before its new time; a gone one not at all.
+        for move in changes.moved {
+            reminders.forget(move.event.id)
+            dismissPeek?("event-soon-\(move.event.id)")
+        }
+        for event in changes.removed { dismissPeek?("event-soon-\(event.id)") }
+        if announce { tell(changes, cancelled: cancelled) }
         inbox?.dropEnded(now: now)
         for event in reminders.due(events, minutes: settings.reminderMinutes, now: now) { remind(event, now: now) }
     }
 
-    private func tell(_ changes: EventChanges) {
+    /// Gone from today and tomorrow: cancelled, unless EventKit still has it (moved past
+    /// tomorrow). A repeating event always has its series, so a gone occurrence of it counts
+    /// as cancelled.
+    private func isCancelled(_ event: CalendarEvent) -> Bool {
+        guard let id = event.eventKitId, let still = store.event(withIdentifier: id) else { return true }
+        return still.hasRecurrenceRules
+    }
+
+    private func tell(_ changes: EventChanges, cancelled: [CalendarEvent]) {
         for event in changes.added.prefix(3) {
             log.info("new event")
             news(PeekContent(id: "event-new-\(event.id)", symbol: "calendar.badge.plus", tint: .blue,
@@ -132,6 +157,11 @@ final class CalendarIntegration: Integration {
             news(PeekContent(id: "event-moved-\(move.event.id)", symbol: "calendar.badge.clock", tint: .orange,
                              title: "Перенесено: \(Self.time(move.oldStart)) → \(Self.time(move.event.start))",
                              subtitle: move.event.title), event: move.event)
+        }
+        for event in cancelled.prefix(3) {
+            log.info("cancelled event")
+            news(PeekContent(id: "event-cancelled-\(event.id)", symbol: "calendar.badge.minus", tint: .red,
+                             title: "Отменено: \(Self.time(event.start))", subtitle: event.title), event: event)
         }
     }
 
@@ -203,7 +233,8 @@ final class CalendarIntegration: Integration {
                              start: e.startDate, end: e.endDate, isAllDay: e.isAllDay,
                              location: e.location?.isEmpty == false ? e.location : nil,
                              calendarTitle: e.calendar.title,
-                             meeting: MeetingLink.find(url: e.url, location: e.location, notes: e.notes))
+                             meeting: MeetingLink.find(url: e.url, location: e.location, notes: e.notes),
+                             eventKitId: e.eventIdentifier)
     }
 
     static func time(_ date: Date) -> String { date.formatted(date: .omitted, time: .shortened) }

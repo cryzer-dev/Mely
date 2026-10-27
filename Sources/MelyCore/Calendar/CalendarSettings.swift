@@ -50,4 +50,9 @@ public struct ReminderSchedule: Sendable {
         shown.formUnion(due.map(\.id))
         return due
     }
+
+    /// The event moved: it is reminded of again before its new time.
+    public mutating func forget(_ id: String) {
+        shown.remove(id)
+    }
 }
