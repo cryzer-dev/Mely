@@ -258,13 +258,18 @@ public enum Fixtures {
         return Agenda(today: events == 0 ? [] : today, tomorrow: [])
     }
 
-    /// One meeting with a link in 12 minutes, under a long dotted name.
+    /// Meetings with a link in 12 and 20 minutes under long dotted names: a known service
+    /// and a site Mely does not know.
     public static func soonMeeting() -> Agenda {
         let now = Date()
         let telemost = MeetingLink(service: .telemost, url: URL(string: "https://telemost.yandex.ru/j/5512")!)
+        let jitsi = MeetingLink(service: .other, url: URL(string: "https://meet.jit.si/payments-sync")!)
         return Agenda(today: [CalendarEvent(id: "soon", title: "Shared.Пополнение баланса — синк команды платежей и разбор инцидентов",
                                             start: now.addingTimeInterval(12 * 60 + 20), end: now.addingTimeInterval(57 * 60),
-                                            isAllDay: false, meeting: telemost)],
+                                            isAllDay: false, meeting: telemost),
+                              CalendarEvent(id: "link", title: "Shared.Списания — ретро команды платежей за квартал",
+                                            start: now.addingTimeInterval(20 * 60 + 20), end: now.addingTimeInterval(65 * 60),
+                                            isAllDay: false, meeting: jitsi)],
                       tomorrow: [])
     }
 

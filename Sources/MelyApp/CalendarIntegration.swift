@@ -137,9 +137,10 @@ final class CalendarIntegration: Integration {
         // The title counts down by itself ("· через 4 мин", then "· идёт 12 мин"); it stays
         // until «×», «Подключиться» or the event's end.
         peek?(PeekContent(id: id, symbol: "video.fill", tint: .green, title: event.title,
-                          subtitle: event.meeting.map { "Встреча в \($0.service.title)" } ?? (event.location ?? Self.time(event.start)),
+                          subtitle: event.meeting.map { $0.service == .other ? "Встреча · \($0.name)" : "Встреча в \($0.name)" }
+                              ?? (event.location ?? Self.time(event.start)),
                           appBundleId: event.meeting?.service.appBundleId,
-                          actionTitle: event.meeting == nil ? nil : "Подключиться", until: event.start,
+                          actionTitle: event.meeting?.actionTitle, until: event.start,
                           staysUntil: event.end))
     }
 
@@ -154,7 +155,8 @@ final class CalendarIntegration: Integration {
         join(link)
     }
 
-    /// «Подключиться»: the service's app when installed and chosen, else the browser.
+    /// «Подключиться»: the service's app when installed and chosen, else the browser;
+    /// «Открыть ссылку» (a site Mely does not know): always the browser.
     func join(_ link: MeetingLink) {
         let workspace = NSWorkspace.shared
         guard settings.opensInApp(link.service), let id = link.service.appBundleId,

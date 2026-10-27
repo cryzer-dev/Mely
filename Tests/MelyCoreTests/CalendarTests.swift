@@ -58,7 +58,27 @@ import Foundation
         #expect(inNotes?.url.absoluteString == "https://telemost.yandex.ru/j/5512345678")
         #expect(MeetingLink.find(url: URL(string: "https://us02web.zoom.us/j/8312?pwd=abc"), location: nil, notes: nil)?.service == .zoom)
         #expect(MeetingLink.find(url: nil, location: "https://meet.google.com/abc-defg-hij", notes: nil)?.service == .meet)
-        #expect(MeetingLink.find(url: URL(string: "https://example.com"), location: "офис", notes: "без ссылки") == nil)
+        #expect(MeetingLink.find(url: nil, location: "офис", notes: "без ссылки") == nil)
+    }
+
+    @Test func findsUnknownCallLinks() {
+        let jitsi = MeetingLink.find(url: nil, location: "https://meet.jit.si/retro-team", notes: nil)
+        #expect(jitsi?.service == .other)
+        #expect(jitsi?.url.absoluteString == "https://meet.jit.si/retro-team")
+        #expect(jitsi?.name == "meet.jit.si")
+        #expect(jitsi?.actionTitle == "Открыть ссылку")
+        #expect(MeetingLink.find(url: nil, location: "Переговорка", notes: "Звонок: https://ktalk.ru/abc")?.url.host == "ktalk.ru")
+        // The url field first, then the location, then the notes.
+        #expect(MeetingLink.find(url: URL(string: "https://www.webinar.example.ru/room"), location: "https://a.example.com",
+                                 notes: nil)?.name == "webinar.example.ru")
+        // A known service wins wherever it stands.
+        let known = MeetingLink.find(url: nil, location: nil,
+                                     notes: "Документ: https://docs.example.com/plan\nhttps://telemost.yandex.ru/j/55")
+        #expect(known?.service == .telemost)
+        #expect(known?.actionTitle == "Подключиться")
+        // The event's own page in the calendar is not a call.
+        #expect(MeetingLink.find(url: URL(string: "https://calendar.yandex.ru/event?event_id=1"), location: nil, notes: nil) == nil)
+        #expect(MeetingLink.find(url: nil, location: "офис", notes: "без ссылки") == nil)
     }
 
     @Test func appLinks() {

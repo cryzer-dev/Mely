@@ -100,6 +100,8 @@ public struct EventSnapshot: Sendable {
 public struct MeetingLink: Equatable, Sendable {
     public enum Service: String, CaseIterable, Sendable {
         case telemost, zoom, meet, teams
+        /// A link Mely does not know (Jitsi, Толк, a webinar on its own site): the browser.
+        case other
 
         public var title: String {
             switch self {
@@ -107,6 +109,7 @@ public struct MeetingLink: Equatable, Sendable {
             case .zoom: "Zoom"
             case .meet: "Google Meet"
             case .teams: "Teams"
+            case .other: "Ссылка"
             }
         }
 
@@ -116,7 +119,7 @@ public struct MeetingLink: Equatable, Sendable {
             case .telemost: "ru.yandex.desktop.telemost"
             case .zoom: "us.zoom.xos"
             case .teams: "com.microsoft.teams2"
-            case .meet: nil
+            case .meet, .other: nil
             }
         }
 
@@ -138,15 +141,33 @@ public struct MeetingLink: Equatable, Sendable {
         self.url = url
     }
 
-    /// The first call link in the event's url, then location, then notes.
+    /// The service, or the link's site for one Mely does not know ("meet.jit.si").
+    public var name: String {
+        guard service == .other, let host = url.host else { return service.title }
+        return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+    }
+
+    /// The button: a known service is joined, anything else is a link to open.
+    public var actionTitle: String { service == .other ? "Открыть ссылку" : "Подключиться" }
+
+    /// A known service's link in the event's url, then location, then notes; failing that,
+    /// the first link of any site in the same order (a document link in the notes loses to
+    /// a Telemost link below it).
     public static func find(url: URL?, location: String?, notes: String?) -> MeetingLink? {
-        if let url, let host = url.host, let service = Service.of(host: host) { return MeetingLink(service: service, url: url) }
-        for text in [location, notes].compactMap({ $0 }) {
-            for found in links(in: text) {
-                if let host = found.host, let service = Service.of(host: host) { return MeetingLink(service: service, url: found) }
-            }
+        let found = ([url].compactMap { $0 }.filter { $0.scheme == "https" || $0.scheme == "http" }
+            + [location, notes].compactMap { $0 }.flatMap(links(in:)))
+            .filter { $0.host.map { !isCalendarPage($0) } ?? false }
+        for link in found {
+            if let service = Service.of(host: link.host!) { return MeetingLink(service: service, url: link) }
         }
-        return nil
+        return found.first.map { MeetingLink(service: .other, url: $0) }
+    }
+
+    /// The event's own page in a calendar: a link to the event, not to a call.
+    static func isCalendarPage(_ host: String) -> Bool {
+        let h = host.lowercased()
+        return h == "calendar.yandex.ru" || h == "calendar.google.com" || h == "outlook.office.com"
+            || h == "outlook.office365.com" || h == "outlook.live.com" || h == "www.icloud.com"
     }
 
     private static func links(in text: String) -> [URL] {
@@ -178,7 +199,7 @@ public struct MeetingLink: Equatable, Sendable {
             let s = url.absoluteString
             guard let range = s.range(of: "/l/") else { return nil }
             return URL(string: "msteams:" + s[range.lowerBound...])
-        case .telemost, .meet:
+        case .telemost, .meet, .other:
             return nil
         }
     }

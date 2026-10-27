@@ -107,7 +107,7 @@ private struct EventRow: View {
                 .frame(width: 3)
             VStack(alignment: .leading, spacing: 2) {
                 Text(event.title).font(.system(size: MelyType.body, weight: .semibold)).lineLimit(1).truncationMode(.tail)
-                if let detail = event.meeting?.service.title ?? event.location, !detail.isEmpty {
+                if let detail = event.meeting?.name ?? event.location, !detail.isEmpty {
                     Text(detail).font(.system(size: MelyType.footnote)).foregroundStyle(.white.opacity(MelyInk.secondary)).lineLimit(1)
                 }
             }
@@ -122,9 +122,9 @@ private struct EventRow: View {
                     .fixedSize()
                     .layoutProbe("agenda.event.\(event.id).countdown", inside: "agenda.event.\(event.id)", checksWhole: true)
             }
-            if event.meeting != nil, !isPast {
+            if let meeting = event.meeting, !isPast {
                 // Never squeezed: the title gives way instead.
-                Button("Подключиться", action: join)
+                Button(meeting.actionTitle, action: join)
                     .buttonStyle(.plain)
                     .lineLimit(1)
                     .fixedSize()
