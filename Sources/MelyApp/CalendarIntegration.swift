@@ -33,6 +33,9 @@ final class CalendarIntegration: Integration {
     @ObservationIgnored private var upcoming: [CalendarEvent] = []
     /// Previews under the notch; meeting reminders carry «Подключиться».
     @ObservationIgnored var peek: ((PeekContent) -> Void)?
+    /// The "Уведомления" tab, shared with the mirrored notifications; what of it is kept.
+    @ObservationIgnored var inbox: NotificationInbox?
+    @ObservationIgnored var inboxSettings: InboxSettings?
     /// Joins pending on a reminder's button, by preview id.
     @ObservationIgnored private var pendingJoins: [String: MeetingLink] = [:]
 
@@ -65,6 +68,7 @@ final class CalendarIntegration: Integration {
         reloadTask?.cancel()
         agenda = nil
         snapshot = EventSnapshot()
+        inbox?.removeCalendar()
         status = .off
     }
 
@@ -113,21 +117,29 @@ final class CalendarIntegration: Integration {
 
         let changes = snapshot.update(events)
         if announce { tell(changes) }
+        inbox?.dropEnded(now: now)
         for event in reminders.due(events, minutes: settings.reminderMinutes, now: now) { remind(event, now: now) }
     }
 
     private func tell(_ changes: EventChanges) {
         for event in changes.added.prefix(3) {
             log.info("new event")
-            peek?(PeekContent(id: "event-new-\(event.id)", symbol: "calendar.badge.plus", tint: .blue,
-                              title: "Новое событие · \(Self.time(event.start))", subtitle: event.title))
+            news(PeekContent(id: "event-new-\(event.id)", symbol: "calendar.badge.plus", tint: .blue,
+                             title: "Новое событие · \(Self.time(event.start))", subtitle: event.title), event: event)
         }
         for move in changes.moved.prefix(3) {
             log.info("moved event")
-            peek?(PeekContent(id: "event-moved-\(move.event.id)", symbol: "calendar.badge.clock", tint: .orange,
-                              title: "Перенесено: \(Self.time(move.oldStart)) → \(Self.time(move.event.start))",
-                              subtitle: move.event.title))
+            news(PeekContent(id: "event-moved-\(move.event.id)", symbol: "calendar.badge.clock", tint: .orange,
+                             title: "Перенесено: \(Self.time(move.oldStart)) → \(Self.time(move.event.start))",
+                             subtitle: move.event.title), event: move.event)
         }
+    }
+
+    /// Under the notch, and into the "Уведомления" tab until the event is over.
+    private func news(_ content: PeekContent, event: CalendarEvent) {
+        peek?(content)
+        guard inboxSettings?.keepsCalendar ?? true else { return }
+        inbox?.addCalendar(eventId: event.id, symbol: content.symbol, title: content.title, text: content.subtitle, ends: event.end)
     }
 
     private func remind(_ event: CalendarEvent, now: Date) {

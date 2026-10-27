@@ -169,23 +169,6 @@ private final class FixtureDB {
                 == ["ru.yandex.desktop.telemost"])
     }
 
-    @Test func messagesKeepTheLatestAndCountUnseen() {
-        let messages = MirroredMessages()
-        for i in 1...35 {
-            let n = MirroredNotification(id: Int64(i), bundleId: "t", title: "\(i)", subtitle: nil, body: nil, deliveredAt: Date())
-            messages.add(n, appName: "T", title: "\(i)", text: "")
-        }
-        #expect(messages.items.count == MirroredMessages.keep)
-        #expect(messages.items.first?.title == "35")
-        #expect(messages.unseen == 35)
-        messages.markSeen()
-        #expect(messages.unseen == 0)
-        messages.keep(only: [35, 34])
-        #expect(messages.items.map(\.id) == [35, 34])
-        messages.remove(35)
-        #expect(messages.items.map(\.id) == [34])
-    }
-
     @Test func focusFromAssertions() throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("mely-focus-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

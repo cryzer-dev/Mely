@@ -237,7 +237,7 @@ private struct CardButton: View {
 @MainActor
 @Observable
 public final class IslandTabs {
-    public enum Tab: Hashable, Sendable { case sessions, chat, messages, today, music }
+    public enum Tab: Hashable, Sendable { case sessions, chat, notifications, today, music }
     public var selected: Tab = .sessions
     /// Bumped to put the cursor in the chat field.
     public var chatFocus = 0
@@ -258,9 +258,8 @@ public struct ClaudeOverview: View {
     let usage: PlanUsageStore?
     let tabs: IslandTabs?
     let chat: AnyView?
-    /// The mirrored notifications tab, with its unseen count.
-    let messages: AnyView?
-    let messagesBadge: Int
+    /// The "Уведомления" tab.
+    let notifications: AnyView?
     /// The calendar's "Сегодня" tab.
     let today: AnyView?
     /// The mini-player, while something plays (and 5 minutes after).
@@ -272,7 +271,7 @@ public struct ClaudeOverview: View {
     @State private var heights: [IslandTabs.Tab: CGFloat] = [:]
 
     public init(store: SessionStore, queue: ApprovalQueue, usage: PlanUsageStore? = nil,
-                tabs: IslandTabs? = nil, chat: AnyView? = nil, messages: AnyView? = nil, messagesBadge: Int = 0,
+                tabs: IslandTabs? = nil, chat: AnyView? = nil, notifications: AnyView? = nil,
                 today: AnyView? = nil, music: AnyView? = nil,
                 open: @escaping (ClaudeSession) -> Void,
                 decide: @escaping (PendingRequest, HookDecision) -> Void,
@@ -282,8 +281,7 @@ public struct ClaudeOverview: View {
         self.usage = usage
         self.tabs = tabs
         self.chat = chat
-        self.messages = messages
-        self.messagesBadge = messagesBadge
+        self.notifications = notifications
         self.today = today
         self.music = music
         self.open = open
@@ -303,8 +301,8 @@ public struct ClaudeOverview: View {
                 Group {
                     if tabs.selected == .chat, let chat {
                         chat
-                    } else if tabs.selected == .messages, let messages {
-                        messages
+                    } else if tabs.selected == .notifications, let notifications {
+                        notifications
                     } else if tabs.selected == .today, let today {
                         today
                     } else if tabs.selected == .music, let music {

@@ -57,7 +57,7 @@ public enum Fixtures {
             .init(.chat, icon: "bubble.left.fill", title: "Чат"),
             .init(.today, icon: "calendar", title: "Сегодня"),
             .init(.music, icon: "music.note", title: "Музыка"),
-            .init(.messages, icon: "bell.fill", title: "Сообщения", badge: 3),
+            .init(.notifications, icon: "bell.fill", title: "Уведомления", badge: 3),
         ], usage: usage ?? self.usage(.header), soundOn: true, heldOpen: held, updateAvailable: updateAvailable,
            showsUsage: showsUsage, toggleSound: {}, openSettings: {}, close: {})
     }
@@ -281,8 +281,8 @@ public enum Fixtures {
                               open: { _ in }, decide: { _, _ in }, answerInTerminal: { _ in })
     }
 
-    public static func messages(_ count: Int, long: Bool = false) -> MirroredMessages {
-        let messages = MirroredMessages()
+    public static func messages(_ count: Int, long: Bool = false, calendar: Bool = false) -> NotificationInbox {
+        let messages = NotificationInbox()
         let now = Date()
         let sample: [(String, String, String)] = [
             ("com.google.Chrome", "Новый заказ", "shop.ru — Заказ №42 оплачен"),
@@ -297,14 +297,22 @@ public enum Fixtures {
                                          deliveredAt: now.addingTimeInterval(-Double(count - i) * 300))
             messages.add(n, appName: s.1, title: title, text: text)
         }
+        if calendar {
+            messages.addCalendar(eventId: "new", symbol: "calendar.badge.plus", title: "Новое событие · 16:00",
+                                 text: long ? "Shared.Пополнение баланса — синк команды платежей и разбор инцидентов" : "Ревью дизайна",
+                                 ends: now.addingTimeInterval(7200), date: now.addingTimeInterval(-120))
+            messages.addCalendar(eventId: "moved", symbol: "calendar.badge.clock", title: "Перенесено: 14:00 → 15:30",
+                                 text: long ? "Груминг бэклога команды корзины, оплаты и доставки на следующий спринт" : "Груминг",
+                                 ends: now.addingTimeInterval(7200), date: now.addingTimeInterval(-30))
+        }
         return messages
     }
 
-    public static func messagesPage(_ messages: MirroredMessages) -> some View {
+    public static func messagesPage(_ messages: NotificationInbox) -> some View {
         let tabs = IslandTabs()
-        tabs.selected = .messages
+        tabs.selected = .notifications
         return ClaudeOverview(store: SessionStore(), queue: ApprovalQueue(), tabs: tabs,
-                              messages: AnyView(MessagesView(messages: messages) { (_: Int64) in }),
+                              notifications: AnyView(NotificationsView(inbox: messages) { _ in }),
                               open: { _ in }, decide: { _, _ in }, answerInTerminal: { _ in })
     }
 

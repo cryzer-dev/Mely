@@ -158,9 +158,15 @@ public enum LayoutMatrix {
 
     static func messages(_ screen: Fixtures.Screen) -> [LayoutVariant] {
         [
-            expanded("Messages_Empty", screen, .messages) { Fixtures.messagesPage(Fixtures.messages(0)) },
-            expanded("Messages_Three", screen, .messages) { Fixtures.messagesPage(Fixtures.messages(3)) },
-            expanded("Messages_Overflow", screen, .messages) { Fixtures.messagesPage(Fixtures.messages(30, long: true)) },
+            expanded("Notifications_Empty", screen, .notifications) { Fixtures.messagesPage(Fixtures.messages(0)) },
+            expanded("Notifications_Three", screen, .notifications) { Fixtures.messagesPage(Fixtures.messages(3)) },
+            expanded("Notifications_Calendar", screen, .notifications) {
+                Fixtures.messagesPage(Fixtures.messages(2, calendar: true))
+            },
+            expanded("Notifications_CalendarLong", screen, .notifications) {
+                Fixtures.messagesPage(Fixtures.messages(1, long: true, calendar: true))
+            },
+            expanded("Notifications_Overflow", screen, .notifications) { Fixtures.messagesPage(Fixtures.messages(30, long: true)) },
         ]
     }
 

@@ -101,7 +101,7 @@ enum Snapshots {
             }.environment(\.characterDrag, CharacterDrag(isAway: true, began: { _ in }, moved: { _ in }, ended: { _ in },
                                                           callHome: {})))),
             Snapshot(name: "Settings_Updates", view: AnyView(updateSettings())),
-            Snapshot(name: "Messages_Tab", view: AnyView(messagesTab())),
+            Snapshot(name: "Notifications_Tab", view: AnyView(messagesTab())),
             Snapshot(name: "PlanUsageGauge", view: AnyView(planUsage())),
             Snapshot(name: "Sessions_StaleUsage", view: AnyView(expandedApp(.sessions, pose: .working) {
                 Fixtures.sessionsPage(Fixtures.sessions(2), usage: Fixtures.usage(.stale))
@@ -267,8 +267,10 @@ enum Snapshots {
         behavior.collapseAfter = IslandBehavior.never
         return GeneralSettingsView(behavior: behavior,
                                    sounds: .init(test: {}, openFolder: {}, reload: { 2 }, customized: 2),
-                                   launchAtLogin: .constant(true), peeks: Fixtures.peeks(), displayChanged: {})
-            .frame(width: 560, height: 980)
+                                   launchAtLogin: .constant(true), peeks: Fixtures.peeks(),
+                                   inbox: InboxSettings(defaults: UserDefaults(suiteName: "mely-snapshots-inbox")!),
+                                   displayChanged: {})
+            .frame(width: 560, height: 1180)
     }
 
     /// Settings → Основные → Обновления in each state, and a long local version.
@@ -516,9 +518,9 @@ enum Snapshots {
             .background(backdrop)
     }
 
-    /// The overview's messages tab with a few mirrored notifications and an unseen count.
+    /// The overview's "Уведомления" tab: a few mirrored notifications, a moved meeting, an unseen count.
     @MainActor private static func messagesTab() -> some View {
-        let messages = MirroredMessages()
+        let messages = NotificationInbox()
         let now = Date()
         let sample: [(String, String, String, TimeInterval)] = [
             ("com.google.Chrome", "Новый заказ", "shop.ru — Заказ №42 оплачен", 1500),
@@ -530,11 +532,13 @@ enum Snapshots {
                                          deliveredAt: now.addingTimeInterval(-s.3))
             messages.add(n, appName: s.1, title: s.1, text: s.2)
         }
+        messages.addCalendar(eventId: "g", symbol: "calendar.badge.clock", title: "Перенесено: 14:00 → 15:30", text: "Груминг",
+                             ends: now.addingTimeInterval(7200), date: now.addingTimeInterval(-30))
         let tabs = IslandTabs()
-        tabs.selected = .messages
-        return expandedApp(.messages) {
+        tabs.selected = .notifications
+        return expandedApp(.notifications) {
             ClaudeOverview(store: SessionStore(), queue: ApprovalQueue(), tabs: tabs,
-                           messages: AnyView(MessagesView(messages: messages) { (_: Int64) in }),
+                           notifications: AnyView(NotificationsView(inbox: messages) { _ in }),
                            open: { _ in }, decide: { _, _ in }, answerInTerminal: { _ in })
         }
     }

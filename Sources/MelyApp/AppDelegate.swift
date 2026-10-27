@@ -17,6 +17,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let calendar = CalendarIntegration()
     private let nowPlaying = NowPlayingIntegration()
     private let tabs = IslandTabs()
+    private let inboxSettings = InboxSettings()
+    private lazy var inbox = NotificationInbox(fileURL: inboxSettings.persists ? NotificationInbox.defaultURL : nil)
     private var chatHotKey: GlobalHotKey?
     private var sessions: ClaudeSessionsController?
     private let characterSettings = CharacterSettings()
@@ -27,10 +29,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var updates: UpdateController?
     private let fullScreen = FullScreenWatcher()
     private lazy var settings = SettingsWindowController(registry: registry, characters: characterSettings, behavior: behavior,
-                                                         updates: updateState, peeks: nowPlaying.peeks,
+                                                         updates: updateState, peeks: nowPlaying.peeks, inbox: inboxSettings,
                                                          displayChanged: { [weak self] in self?.island?.relocateToChosenScreen() })
 
     func applicationWillTerminate(_ notification: Notification) {
+        inbox.saveNow()
         DevBuildSwap.handBack()
     }
 
@@ -60,17 +63,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             },
             compactTrailing: AnyView(CompactSessionStatus(store: store, usage: sessions.usage, music: nowPlaying.model)),
-            expanded: { [chat, notifications, calendar, nowPlaying, tabs, updateState] in
+            expanded: { [chat, notifications, calendar, nowPlaying, tabs, updateState, inbox, inboxSettings] in
                 WithCharacter(settings: character, desktop: desktop) { ExpandedIsland(sessions: sessions, chat: chat, notifications: notifications, calendar: calendar,
                                nowPlaying: nowPlaying, tabs: tabs, updates: updateState,
+                               inbox: inbox, inboxSettings: inboxSettings,
                                enableCalendar: { [weak self] in
                                    guard let self else { return }
                                    Task { await self.registry.setEnabled("calendar", true) }
                                }) }
             },
-            header: { [chat, notifications, nowPlaying, tabs, behavior, updateState] in
-                ExpandedHeader(sessions: sessions, chat: chat, notifications: notifications, nowPlaying: nowPlaying,
+            header: { [chat, notifications, calendar, nowPlaying, tabs, behavior, updateState, inbox, inboxSettings] in
+                ExpandedHeader(sessions: sessions, chat: chat, notifications: notifications, calendar: calendar, nowPlaying: nowPlaying,
                                tabs: tabs, behavior: behavior, updates: updateState,
+                               inbox: inbox, inboxSettings: inboxSettings,
                                openSettings: { [weak self] in self?.openSettings() },
                                close: { [weak self] in self?.island?.collapseFromHeader() })
             })
@@ -122,6 +127,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         registry.permissions = permissions
         registry.register(claudeCode)
         registry.register(chat)
+        let inbox = inbox, inboxSettings = inboxSettings
+        inboxSettings.changed = { inbox.apply(inboxSettings) }
+        notifications.inbox = inbox
+        notifications.inboxSettings = inboxSettings
+        calendar.inbox = inbox
+        calendar.inboxSettings = inboxSettings
         registry.register(notifications)
         registry.register(calendar)
         registry.register(nowPlaying)
@@ -315,6 +326,8 @@ private struct ExpandedIsland: View {
     let nowPlaying: NowPlayingIntegration
     let tabs: IslandTabs
     let updates: UpdateState
+    let inbox: NotificationInbox
+    let inboxSettings: InboxSettings
     /// Switches the calendar integration on (macOS then asks for calendar access).
     let enableCalendar: () -> Void
 
@@ -340,10 +353,16 @@ private struct ExpandedIsland: View {
                                                      openSettings: { [weak chat] in chat?.showSettings() },
                                                      openInClaude: Self.claudeDesktopInstalled ? { Self.openInClaude(c) } : nil))
                        },
-                       messages: notifications.messages.map { m in
-                           AnyView(MessagesView(messages: m) { notifications.open(id: $0) })
-                       },
-                       messagesBadge: notifications.messages?.unseen ?? 0,
+                       notifications: NotificationsTab.isShown(notifications: notifications, calendar: calendar, settings: inboxSettings)
+                           ? AnyView(NotificationsView(inbox: inbox) { [tabs] item in
+                               if item.isCalendar {
+                                   inbox.remove(item.id)
+                                   tabs.selected = .today
+                               } else {
+                                   notifications.open(item)
+                               }
+                           })
+                           : nil,
                        // Always there: switched off, it offers to connect the calendar.
                        today: AnyView(AgendaView(agenda: calendar.agenda, isOn: calendar.status != .off,
                                                  enable: enableCalendar) { event in
@@ -366,10 +385,13 @@ private struct ExpandedHeader: View {
     let sessions: ClaudeSessionsController
     let chat: ClaudeChatIntegration
     let notifications: NotificationMirrorIntegration
+    let calendar: CalendarIntegration
     let nowPlaying: NowPlayingIntegration
     let tabs: IslandTabs
     let behavior: IslandBehavior
     let updates: UpdateState
+    let inbox: NotificationInbox
+    let inboxSettings: InboxSettings
     let openSettings: () -> Void
     let close: () -> Void
 
@@ -380,8 +402,8 @@ private struct ExpandedHeader: View {
         if nowPlaying.status == .running && nowPlaying.model.isVisible() {
             items.append(.init(.music, icon: "music.note", title: "Музыка"))
         }
-        if let messages = notifications.messages {
-            items.append(.init(.messages, icon: "bell.fill", title: "Сообщения", badge: messages.unseen))
+        if NotificationsTab.isShown(notifications: notifications, calendar: calendar, settings: inboxSettings) {
+            items.append(.init(.notifications, icon: "bell.fill", title: "Уведомления", badge: inbox.unseen))
         }
         return IslandHeader(tabs: tabs, items: items, usage: sessions.usage, soundOn: behavior.soundOn,
                             heldOpen: !sessions.queue.requests.isEmpty,
@@ -460,5 +482,13 @@ private struct ChatAwarePose: View {
         TimelineView(.explicit(end)) { context in
             MelyStage(pose: conversation?.characterPose(now: context.date) ?? fallback)
         }
+    }
+}
+
+/// The "Уведомления" tab is there while one of its sources is on and kept in it.
+@MainActor
+enum NotificationsTab {
+    static func isShown(notifications: NotificationMirrorIntegration, calendar: CalendarIntegration, settings: InboxSettings) -> Bool {
+        (notifications.status != .off && settings.keepsMessages) || (calendar.status != .off && settings.keepsCalendar)
     }
 }

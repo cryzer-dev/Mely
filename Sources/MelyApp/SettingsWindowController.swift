@@ -13,6 +13,7 @@ final class SettingsWindowController {
     private let behavior: IslandBehavior
     private let updates: UpdateState
     private let peeks: NowPlayingPeeks
+    private let inbox: InboxSettings
     private let displayChanged: () -> Void
     /// The island: folded before the window shows, and the window kept below it (its screen
     /// and the lowest edge the window's top may reach).
@@ -20,12 +21,13 @@ final class SettingsWindowController {
     var islandArea: () -> (screen: NSScreen, bottom: CGFloat)? = { nil }
 
     init(registry: IntegrationRegistry, characters: CharacterSettings, behavior: IslandBehavior, updates: UpdateState,
-         peeks: NowPlayingPeeks, displayChanged: @escaping () -> Void) {
+         peeks: NowPlayingPeeks, inbox: InboxSettings, displayChanged: @escaping () -> Void) {
         self.registry = registry
         self.characters = characters
         self.behavior = behavior
         self.updates = updates
         self.peeks = peeks
+        self.inbox = inbox
         self.displayChanged = displayChanged
     }
 
@@ -33,7 +35,7 @@ final class SettingsWindowController {
         if let section { UserDefaults.standard.set(section.rawValue, forKey: SettingsSection.defaultsKey) }
         if window == nil {
             let view = SettingsRoot(registry: registry, characters: characters, behavior: behavior,
-                                    updates: updates, peeks: peeks, displayChanged: displayChanged)
+                                    updates: updates, peeks: peeks, inbox: inbox, displayChanged: displayChanged)
                 .frame(minWidth: 720, minHeight: 560)
             let window = NSWindow(contentViewController: NSHostingController(rootView: view))
             window.title = "Настройки \(AppInfo.name)"
@@ -102,6 +104,7 @@ private struct SettingsRoot: View {
     let behavior: IslandBehavior
     let updates: UpdateState
     let peeks: NowPlayingPeeks
+    let inbox: InboxSettings
     let displayChanged: () -> Void
     @AppStorage(SettingsSection.defaultsKey) private var selected: SettingsSection = .general
     @State private var launchAtLogin = LoginItem.isOn
@@ -151,6 +154,7 @@ private struct SettingsRoot: View {
                 launchAtLogin: Binding(get: { launchAtLogin }, set: { launchAtLogin = LoginItem.set($0) }),
                 updates: updates,
                 peeks: peeks,
+                inbox: inbox,
                 displayChanged: displayChanged)
         case .character:
             CharacterSettingsView(settings: characters)

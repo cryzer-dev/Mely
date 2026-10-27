@@ -15,6 +15,8 @@ public struct GeneralSettingsView: View {
     let updates: UpdateState?
     /// Previews of new tracks; nil hides the music section.
     let peeks: NowPlayingPeeks?
+    /// What the "Уведомления" tab keeps; nil hides the section.
+    let inbox: InboxSettings?
 
     /// What the sound section can do; the app plays and finds the files.
     public struct Sounds {
@@ -58,10 +60,11 @@ public struct GeneralSettingsView: View {
     }
 
     public init(behavior: IslandBehavior, sounds: Sounds, launchAtLogin: Binding<Bool>, updates: UpdateState? = nil,
-                peeks: NowPlayingPeeks? = nil, displayChanged: @escaping () -> Void) {
+                peeks: NowPlayingPeeks? = nil, inbox: InboxSettings? = nil, displayChanged: @escaping () -> Void) {
         self.behavior = behavior
         self.updates = updates
         self.peeks = peeks
+        self.inbox = inbox
         self.sounds = sounds
         self.launchAtLogin = launchAtLogin
         self.displayChanged = displayChanged
@@ -122,6 +125,7 @@ public struct GeneralSettingsView: View {
             }
 
             if let peeks { MusicPeeksSection(peeks: peeks) }
+            if let inbox { InboxSection(settings: inbox) }
 
             Section {
                 Toggle("Звуки", isOn: $behavior.soundOn)
@@ -267,6 +271,35 @@ public struct ShortcutsSettingsView: View {
                 .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
                 .frame(width: 110, alignment: .leading)
             Text(what)
+        }
+    }
+}
+
+/// Settings → Основные → Вкладка «Уведомления»: what stays in the list and whether it
+/// survives a restart.
+struct InboxSection: View {
+    let settings: InboxSettings
+
+    var body: some View {
+        @Bindable var settings = settings
+        Section {
+            Toggle(isOn: $settings.keepsMessages) {
+                Text("Сообщения приложений")
+                Text("Telegram, Телемост и другие приложения, выбранные в интеграции «Уведомления»")
+            }
+            Toggle(isOn: $settings.keepsCalendar) {
+                Text("Изменения в календаре")
+                Text("Новые и перенесённые события остаются в списке, пока событие не закончится")
+            }
+            Toggle(isOn: $settings.persists) {
+                Text("Хранить после перезапуска")
+                Text("Последние 30 уведомлений хранятся только на этом Mac")
+            }
+        } header: {
+            Text("Вкладка «Уведомления»")
+        } footer: {
+            Text("Под челкой уведомления всплывают как обычно — здесь только то, что остаётся в списке.")
+                .foregroundStyle(.secondary)
         }
     }
 }

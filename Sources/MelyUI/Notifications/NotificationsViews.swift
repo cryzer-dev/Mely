@@ -2,71 +2,72 @@ import SwiftUI
 import AppKit
 import MelyCore
 
-/// The "Сообщения" tab: mirrored notifications, newest first; a click opens the app.
-public struct MessagesView: View {
-    let messages: MirroredMessages
-    /// Opens the app behind the notification with this id.
-    let open: (Int64) -> Void
+/// The "Уведомления" tab: mirrored notifications and calendar news, newest first; a click
+/// opens the app (or «Сегодня» for calendar news).
+public struct NotificationsView: View {
+    let inbox: NotificationInbox
+    let open: (NotificationInbox.Item) -> Void
 
-    public init(messages: MirroredMessages, open: @escaping (Int64) -> Void) {
-        self.messages = messages
+    public init(inbox: NotificationInbox, open: @escaping (NotificationInbox.Item) -> Void) {
+        self.inbox = inbox
         self.open = open
     }
 
     public var body: some View {
         Group {
-            if messages.items.isEmpty {
+            if inbox.items.isEmpty {
                 VStack(spacing: 6) {
                     Image(systemName: "bell.slash").font(.system(size: 18)).foregroundStyle(.white.opacity(MelyInk.tertiary))
                     Text("Пока тихо").font(.system(size: MelyType.title)).foregroundStyle(.white.opacity(MelyInk.secondary))
-                    Text("Здесь появятся уведомления выбранных приложений")
+                    Text("Здесь появятся сообщения и изменения в календаре")
                         .font(.system(size: MelyType.caption)).foregroundStyle(.white.opacity(MelyInk.tertiary))
                 }
-                .layoutProbe("messages.empty", inside: "content")
+                .layoutProbe("notifications.empty", inside: "content")
                 .islandPart()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 VStack(alignment: .trailing, spacing: 6) {
                     ScrollView(.vertical, showsIndicators: false) {
                         VStack(spacing: 6) {
-                            ForEach(messages.items) { item in
-                                Button { open(item.id) } label: { MessageRow(item: item) }
+                            ForEach(inbox.items) { item in
+                                Button { open(item) } label: { NotificationRow(item: item) }
                                     .buttonStyle(.plain)
-                                    .layoutProbe("messages.row.\(item.id)", inside: "messages.list")
-                                    .help("Открыть чат в \(item.appName)")
+                                    .layoutProbe("notifications.row.\(item.id)", inside: "notifications.list")
+                                    .help(item.isCalendar ? "Открыть «Сегодня»" : "Открыть чат в \(item.appName)")
                             }
                         }
                         .islandPart()
                     }
-                    .layoutProbe("messages.list", inside: "content", scrolls: true)
-                    Button("Очистить", action: messages.clear)
+                    .layoutProbe("notifications.list", inside: "content", scrolls: true)
+                    Button("Очистить", action: inbox.clear)
                         .buttonStyle(.plain)
                         .font(.system(size: MelyType.caption, weight: .medium))
                         .foregroundStyle(.white.opacity(MelyInk.secondary))
-                        .layoutProbe("messages.clear", inside: "content")
+                        .layoutProbe("notifications.clear", inside: "content")
                         .islandPart(spacing: 6)
                 }
             }
         }
         .foregroundStyle(.white)
         // Looking at the list is reading it.
-        .onAppear { messages.markSeen() }
-        .onChange(of: messages.items.first?.id) { messages.markSeen() }
+        .onAppear { inbox.markSeen() }
+        .onChange(of: inbox.items.first?.id) { inbox.markSeen() }
     }
 }
 
-private struct MessageRow: View {
-    let item: MirroredMessages.Item
+private struct NotificationRow: View {
+    let item: NotificationInbox.Item
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            AppIcon(bundleId: item.bundleId).frame(width: 24, height: 24)
+            icon.frame(width: 24, height: 24)
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
                     Text(item.title).font(.system(size: MelyType.body, weight: .semibold)).lineLimit(1)
                     Spacer(minLength: 6)
                     Text(item.date.formatted(.relative(presentation: .named, unitsStyle: .abbreviated)))
                         .font(.system(size: MelyType.caption)).foregroundStyle(.white.opacity(MelyInk.tertiary))
+                        .fixedSize()
                 }
                 Text(item.text).font(.system(size: MelyType.footnote)).foregroundStyle(.white.opacity(MelyInk.strong)).lineLimit(2)
             }
@@ -75,7 +76,30 @@ private struct MessageRow: View {
         .background(.white.opacity(MelyFill.card), in: RoundedRectangle(cornerRadius: MelyRadius.medium))
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-        .accessibilityHint("Открыть \(item.appName)")
+        .accessibilityHint(item.isCalendar ? "Открыть «Сегодня»" : "Открыть \(item.appName)")
+    }
+
+    /// The app's icon; calendar news gets its symbol in a circle, as under the notch.
+    @ViewBuilder private var icon: some View {
+        switch item.kind {
+        case .app(let bundleId, _):
+            AppIcon(bundleId: bundleId)
+        case .calendar(_, let symbol, _):
+            Image(systemName: symbol)
+                .font(.system(size: MelyType.caption, weight: .semibold))
+                .frame(width: 24, height: 24)
+                .background(Self.tint(symbol).opacity(0.22), in: Circle())
+                .foregroundStyle(Self.tint(symbol))
+        }
+    }
+
+    /// The colours of the calendar previews: new blue, moved orange, cancelled red.
+    static func tint(_ symbol: String) -> Color {
+        switch symbol {
+        case "calendar.badge.clock": Color(red: 1.0, green: 0.6, blue: 0.2)
+        case "calendar.badge.minus": Color(red: 1.0, green: 0.38, blue: 0.35)
+        default: Color(red: 0.36, green: 0.56, blue: 1.0)
+        }
     }
 }
 

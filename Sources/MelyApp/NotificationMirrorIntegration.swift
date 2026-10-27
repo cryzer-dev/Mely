@@ -17,8 +17,9 @@ final class NotificationMirrorIntegration: Integration {
     let summary = "Сообщения Telegram и Телемоста, ответы Claude и уведомления сайтов в челке"
     let requiredPermissions: [SystemPermission] = [.fullDiskAccess]
     private(set) var status: IntegrationStatus = .off
-    /// Exists while on: the overview's "Сообщения" tab.
-    private(set) var messages: MirroredMessages?
+    /// The "Уведомления" tab, shared with the calendar; what of it is kept.
+    @ObservationIgnored var inbox: NotificationInbox?
+    @ObservationIgnored var inboxSettings: InboxSettings?
 
     @ObservationIgnored let settings = NotificationMirrorSettings(installed: {
         NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) != nil
@@ -37,7 +38,6 @@ final class NotificationMirrorIntegration: Integration {
     }
 
     func start() async {
-        messages = messages ?? MirroredMessages()
         startWatching()
     }
 
@@ -45,7 +45,7 @@ final class NotificationMirrorIntegration: Integration {
         retry?.invalidate(); retry = nil
         pruneTimer?.invalidate(); pruneTimer = nil
         watcher?.stop(); watcher = nil
-        messages = nil
+        inbox?.removeApps()
         status = .off
     }
 
@@ -73,12 +73,11 @@ final class NotificationMirrorIntegration: Integration {
         guard pruneTimer == nil else { return }
         let t = Timer(timeInterval: 3, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self, let messages = self.messages, !messages.items.isEmpty,
+                guard let self, let inbox = self.inbox, case let ids = inbox.appRecordIds, !ids.isEmpty,
                       let database = self.watcher?.database else { return }
-                let ids = messages.items.map(\.id)
                 Task.detached {
                     guard let alive = try? database.existing(ids) else { return }
-                    await MainActor.run { messages.keep(only: alive) }
+                    await MainActor.run { inbox.keepApps(only: alive) }
                 }
             }
         }
@@ -87,17 +86,19 @@ final class NotificationMirrorIntegration: Integration {
         pruneTimer = t
     }
 
-    /// Opens the app behind a notification (list row or preview) and drops it: read.
-    func open(id: Int64) {
-        guard let item = messages?.items.first(where: { $0.id == id }) else { return }
-        messages?.remove(id)
-        NotificationOpener.open(bundleId: item.bundleId)
+    /// Opens the app behind a notification in the list and drops it: read.
+    func open(_ item: NotificationInbox.Item) {
+        guard let bundleId = item.bundleId else { return }
+        inbox?.remove(item.id)
+        NotificationOpener.open(bundleId: bundleId)
     }
 
-    /// The preview under the notch was clicked: its id is "notification-<rec_id>".
+    /// The preview under the notch was clicked: its id is "notification-<rec_id>". False
+    /// when the list does not have it (not kept): the island then opens the app itself.
     func openPreview(_ peekId: String) -> Bool {
-        guard peekId.hasPrefix("notification-"), let id = Int64(peekId.dropFirst("notification-".count)) else { return false }
-        open(id: id)
+        guard peekId.hasPrefix("notification-"), let id = Int64(peekId.dropFirst("notification-".count)),
+              let item = inbox?.items.first(where: { $0.id == NotificationInbox.appId(id) }) else { return false }
+        open(item)
         return true
     }
 
@@ -110,7 +111,7 @@ final class NotificationMirrorIntegration: Integration {
             guard retry == nil else { return }
             let t = Timer(timeInterval: 3, repeats: true) { [weak self] _ in
                 MainActor.assumeIsolated {
-                    guard let self, self.watcher == nil, self.messages != nil else { return }
+                    guard let self, self.watcher == nil, self.status == .needsPermission(.fullDiskAccess) else { return }
                     self.startWatching()
                 }
             }
@@ -140,14 +141,20 @@ final class NotificationMirrorIntegration: Integration {
                 case .collect:
                     let preview = MirrorDecision.decide(n, apps: settings.apps, hideText: settings.hideText,
                                                         quietInFocus: false, focusOn: false, appName: name)
-                    if case .preview(let title, let text) = preview { messages?.add(n, appName: name, title: title, text: text) }
+                    if case .preview(let title, let text) = preview { keep(n, appName: name, title: title, text: text) }
                 case .preview(let title, let text):
-                    messages?.add(n, appName: name, title: title, text: text)
+                    keep(n, appName: name, title: title, text: text)
                     peek?(PeekContent(id: "notification-\(n.id)", symbol: "bell.fill", tint: .blue,
                                       title: title, subtitle: text, appBundleId: n.bundleId, opensApp: true))
                 }
             }
         }
+    }
+
+    /// Into the "Уведомления" tab, unless app messages are not kept there.
+    private func keep(_ n: MirroredNotification, appName: String, title: String, text: String) {
+        guard inboxSettings?.keepsMessages ?? true else { return }
+        inbox?.add(n, appName: appName, title: title, text: text)
     }
 
     static func appName(_ bundleId: String) -> String {
