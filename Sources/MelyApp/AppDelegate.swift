@@ -427,7 +427,7 @@ private struct ExpandedIsland: View {
                            })
                            : nil,
                        // Always there: switched off, it offers to connect the calendar.
-                       today: AnyView(AgendaView(agenda: calendar.agenda, isOn: calendar.status != .off,
+                       today: AnyView(AgendaView(agenda: calendar.agenda, isOn: calendar.status != .off, tasks: todayTasks,
                                                  enable: enableCalendar) { event in
                            if let link = event.meeting { calendar.join(link) }
                        }),
@@ -444,6 +444,17 @@ private struct ExpandedIsland: View {
 }
 
 extension ExpandedIsland {
+    /// Today's tasks under the events, while the tasks are on and shown there.
+    var todayTasks: TodayTasks? {
+        guard reminders.status == .running, reminders.settings.showsInToday else { return nil }
+        let reminders = reminders, tabs = tabs
+        return TodayTasks(items: reminders.items, toggle: { reminders.setCompleted($0, $1) }) { id in
+            // The task must be in sight: «Сегодня», no list or tag narrowing it.
+            reminders.settings.filter = TaskFilter(period: .today)
+            tabs.showTask(id)
+        }
+    }
+
     var tasksPage: some View {
         var actions = TasksActions()
         let reminders = reminders

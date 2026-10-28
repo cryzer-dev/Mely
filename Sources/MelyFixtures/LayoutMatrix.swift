@@ -153,6 +153,19 @@ public enum LayoutMatrix {
             expanded("Today_Overflow", screen, .today) { Fixtures.agendaPage(Fixtures.agenda(12, long: true)) },
             // A long name next to both the countdown and «Подключиться».
             expanded("Today_SoonLong", screen, .today) { Fixtures.agendaPage(Fixtures.soonMeeting()) },
+            // Today's tasks under the events; alone when the calendar is off.
+            expanded("Today_Tasks", screen, .today) { Fixtures.agendaPage(Fixtures.agenda(2), tasks: Fixtures.tasks(.ordinary)) },
+            expanded("Today_TasksOnly", screen, .today) { Fixtures.agendaPage(nil, isOn: false, tasks: Fixtures.tasks(.ordinary)) },
+            expanded("Today_TasksOnlyEmpty", screen, .today) { Fixtures.agendaPage(nil, isOn: false, tasks: []) },
+            expanded("Today_NoEventsTasks", screen, .today) { Fixtures.agendaPage(Fixtures.agenda(0), tasks: Fixtures.tasks(.ordinary)) },
+            // Calls at 11 and 13, a task at 12 in the day between them.
+            expanded("Today_Mixed", screen, .today) {
+                let d = Fixtures.mixedDay()
+                return Fixtures.agendaPage(d.agenda, tasks: d.tasks, now: d.now)
+            },
+            expanded("Today_TasksMore", screen, .today) {
+                Fixtures.agendaPage(Fixtures.agenda(1), tasks: Fixtures.tasks(.long) + Fixtures.tasks(.crowded))
+            },
         ]
     }
 

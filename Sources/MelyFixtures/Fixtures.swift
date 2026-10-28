@@ -351,11 +351,41 @@ public enum Fixtures {
                               open: { _ in }, decide: { _, _ in }, answerInTerminal: { _ in })
     }
 
-    public static func agendaPage(_ agenda: Agenda?, isOn: Bool = true) -> some View {
+    /// 10:30 on a working day: calls at 11:00 and 13:00, a task at 12:00 between them,
+    /// one at 15:30, one done at 9:00, one overdue, two without a time.
+    public static func mixedDay() -> (now: Date, agenda: Agenda, tasks: [TaskItem]) {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        func at(_ h: Int, _ m: Int = 0) -> Date { cal.date(bySettingHour: h, minute: m, second: 0, of: today)! }
+        let telemost = MeetingLink(service: .telemost, url: URL(string: "https://telemost.yandex.ru/j/5512")!)
+        let agenda = Agenda(today: [
+            CalendarEvent(id: "m1", title: "Созвон с командой", start: at(11), end: at(11, 45), isAllDay: false, location: nil,
+                          meeting: telemost),
+            CalendarEvent(id: "m2", title: "Демо заказчику", start: at(13), end: at(14), isAllDay: false, location: nil, meeting: telemost),
+        ], tomorrow: [])
+        func task(_ id: String, _ title: String, _ due: TaskDue?, _ p: TaskPriority = .none, estimate: TaskEstimate? = nil,
+                  done: Date? = nil) -> TaskItem {
+            TaskItem(id: id, title: title, due: due, priority: p, marks: TaskMarks(estimate: estimate), listId: "work",
+                     listTitle: "Работа", completedAt: done)
+        }
+        let tasks = [
+            task("x1", "Подготовить отчёт к демо", .time(at(12)), .high, estimate: .m45),
+            task("x2", "Позвонить в банк", .time(at(15, 30)), estimate: .m15),
+            task("x3", "Зарядка", .time(at(9)), done: at(9, 20)),
+            task("x4", "Оплатить интернет", .day(of: cal.date(byAdding: .day, value: -2, to: today)!)),
+            task("x5", "Купить корм", .day(of: today)),
+            task("x6", "Ответить на письмо юристу", .day(of: today), .medium, estimate: .m30),
+        ]
+        return (at(10, 30), agenda, tasks)
+    }
+
+    public static func agendaPage(_ agenda: Agenda?, isOn: Bool = true, tasks: [TaskItem]? = nil,
+                                  now: Date? = nil) -> some View {
         let tabs = IslandTabs()
         tabs.selected = .today
+        let today = tasks.map { TodayTasks(items: $0, toggle: { _, _ in }, open: { _ in }) }
         return ClaudeOverview(store: SessionStore(), queue: ApprovalQueue(), tabs: tabs,
-                              today: AnyView(AgendaView(agenda: agenda, isOn: isOn) { _ in }),
+                              today: AnyView(AgendaView(agenda: agenda, isOn: isOn, tasks: today, now: now) { _ in }),
                               open: { _ in }, decide: { _, _ in }, answerInTerminal: { _ in })
     }
 
