@@ -33,6 +33,18 @@ public struct TaskItem: Identifiable, Equatable, Sendable {
     public var estimate: TaskEstimate? { marks.estimate }
 }
 
+/// A Reminders list.
+public struct TaskList: Identifiable, Equatable, Sendable {
+    /// EventKit's `calendarIdentifier`.
+    public let id: String
+    public let title: String
+
+    public init(id: String, title: String) {
+        self.id = id
+        self.title = title
+    }
+}
+
 /// When a task is due: a day, or a moment on that day.
 public enum TaskDue: Hashable, Sendable {
     case day(year: Int, month: Int, day: Int)
@@ -81,6 +93,15 @@ public enum TaskDue: Hashable, Sendable {
     public func date(calendar: Calendar = .current) -> Date {
         if case let .time(date) = self { return date }
         return dayStart(calendar: calendar)
+    }
+
+    /// The same due on another day: «На завтра» keeps 15:00 at 15:00.
+    public func moved(toDayOf date: Date, calendar: Calendar = .current) -> TaskDue {
+        guard case let .time(old) = self else { return .day(of: date, calendar: calendar) }
+        let t = calendar.dateComponents([.hour, .minute], from: old)
+        let day = calendar.startOfDay(for: date)
+        return calendar.date(bySettingHour: t.hour ?? 0, minute: t.minute ?? 0, second: 0, of: day).map(TaskDue.time)
+            ?? .day(of: date, calendar: calendar)
     }
 
     /// A day is overdue from the next day on; a time, from that moment.

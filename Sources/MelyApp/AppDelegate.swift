@@ -37,6 +37,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         inbox.saveNow()
+        // Deleted tasks still inside their «Отменить» window go now.
+        reminders.flushDeletes()
         DevBuildSwap.handBack()
     }
 
@@ -141,6 +143,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         registry.register(reminders)
         registry.register(nowPlaying)
         nowPlaying.peek = { [weak self] in self?.island?.showPeek($0, for: .seconds(4)) }
+        reminders.peek = { [weak self] in self?.island?.showPeek($0, for: .seconds(4)) }
         calendar.peek = { [weak self] content in
             // An event reminder stays until the event ends (`lastsUntil`); the rest, five seconds.
             self?.island?.showPeek(content)

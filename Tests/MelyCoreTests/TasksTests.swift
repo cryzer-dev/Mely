@@ -52,6 +52,11 @@ import Foundation
         #expect(!TaskDue.time(at(13)).isOverdue(now: now, calendar: cal))
     }
 
+    @Test func movingKeepsTheTime() {
+        #expect(TaskDue.time(at(15)).moved(toDayOf: at(10, plusDays: 1), calendar: cal) == .time(at(15, plusDays: 1)))
+        #expect(day(-3).moved(toDayOf: at(10), calendar: cal) == day(0))
+    }
+
     // MARK: 2.2 Marks in the notes
 
     @Test func writeIntoEmptyNotes() {
