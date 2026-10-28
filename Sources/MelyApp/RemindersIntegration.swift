@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import EventKit
 import Observation
 import OSLog
@@ -17,6 +18,11 @@ final class RemindersIntegration: Integration {
     let summary = "Задачи из Напоминаний: на сегодня, быстрое добавление, перенос и отметка"
     let requiredPermissions: [SystemPermission] = [.reminders]
     private(set) var status: IntegrationStatus = .off
+
+    var actions: [IntegrationAction] {
+        guard status != .off else { return [] }
+        return [IntegrationAction(id: "settings", title: "Задачи…") { [weak self] in self?.showSettings() }]
+    }
     /// Open tasks and today's done ones from the lists shown; empty while off.
     private(set) var items: [TaskItem] = []
     /// Every Reminders list, shown or not (Settings, «Список» chips).
@@ -32,6 +38,7 @@ final class RemindersIntegration: Integration {
     @ObservationIgnored private var store: EKEventStore?
     @ObservationIgnored private var observer: NSObjectProtocol?
     @ObservationIgnored private var timer: Timer?
+    @ObservationIgnored private var settingsWindow: NSWindow?
     @ObservationIgnored private var reloadTask: Task<Void, Never>?
     @ObservationIgnored private var loadTask: Task<Void, Never>?
     /// Bumped on every load: a slower, older load never overwrites a newer one.
@@ -77,6 +84,7 @@ final class RemindersIntegration: Integration {
         reloadTask?.cancel()
         loadTask?.cancel()
         dueTask?.cancel()
+        settingsWindow?.close(); settingsWindow = nil
         store = nil
         items = []
         lists = []
@@ -131,6 +139,27 @@ final class RemindersIntegration: Integration {
             log.info("loaded \(loaded.count) tasks from \(shown.count) lists")
             self.remindIfDue()
         }
+    }
+
+    // MARK: - Settings
+
+    func showSettings() {
+        settingsWindow?.close()
+        let fallback = store?.defaultCalendarForNewReminders().map { TaskList(id: $0.calendarIdentifier, title: $0.title) }
+        let view = TasksSettingsView(settings: settings, lists: lists, defaultList: fallback,
+                                     changed: { [weak self] in self?.reload() },
+                                     close: { [weak self] in
+                                         self?.settingsWindow?.close()
+                                         self?.settingsWindow = nil
+                                     })
+        let window = NSWindow(contentViewController: NSHostingController(rootView: view))
+        window.title = "Mely — задачи"
+        window.styleMask = [.titled, .closable]
+        window.isReleasedWhenClosed = false
+        window.center()
+        settingsWindow = window
+        NSApp.activate()
+        window.makeKeyAndOrderFront(nil)
     }
 
     // MARK: - Due reminders

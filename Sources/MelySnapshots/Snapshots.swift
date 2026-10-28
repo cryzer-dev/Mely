@@ -101,6 +101,7 @@ enum Snapshots {
             }.environment(\.characterDrag, CharacterDrag(isAway: true, began: { _ in }, moved: { _ in }, ended: { _ in },
                                                           callHome: {})))),
             Snapshot(name: "Settings_Updates", view: AnyView(updateSettings())),
+            Snapshot(name: "Settings_Tasks", view: AnyView(tasksSettings())),
             Snapshot(name: "Notifications_Tab", view: AnyView(messagesTab())),
             Snapshot(name: "PlanUsageGauge", view: AnyView(planUsage())),
             Snapshot(name: "Sessions_StaleUsage", view: AnyView(expandedApp(.sessions, pose: .working) {
@@ -290,6 +291,22 @@ enum Snapshots {
             .frame(width: 560)
             .background(scheme == .dark ? Color(white: 0.12) : Color(white: 0.93))
             .environment(\.colorScheme, scheme)
+        }
+        return HStack(spacing: 0) { column(.light); column(.dark) }
+    }
+
+    /// «Задачи…»: three lists, one hidden, new tasks into «Работа»; light and dark.
+    @MainActor private static func tasksSettings() -> some View {
+        let defaults = UserDefaults(suiteName: "mely-snapshots-tasks")!
+        defaults.removePersistentDomain(forName: "mely-snapshots-tasks")
+        let settings = TaskSettings(defaults: defaults)
+        settings.hiddenLists = ["home"]
+        settings.newTaskList = "work"
+        let lists = [TaskList(id: "inbox", title: "Входящие"), TaskList(id: "work", title: "Работа"), TaskList(id: "home", title: "Дом")]
+        func column(_ scheme: ColorScheme) -> some View {
+            TasksSettingsView(settings: settings, lists: lists, defaultList: lists[0], close: {})
+                .background(scheme == .dark ? Color(white: 0.16) : Color(white: 0.95))
+                .environment(\.colorScheme, scheme)
         }
         return HStack(spacing: 0) { column(.light); column(.dark) }
     }
