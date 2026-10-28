@@ -5,10 +5,11 @@ import MelyCore
 struct PeekView: View {
     let content: PeekContent
     var dismiss: (() -> Void)?
-    var primary: (() -> Void)?
-    var secondary: (() -> Void)?
+    /// A button, by its action id.
+    var run: ((String) -> Void)?
 
     var body: some View {
+        let folded = Self.folded(content)
         HStack(spacing: 12) {
             icon
             VStack(alignment: .leading, spacing: 2) {
@@ -19,36 +20,24 @@ struct PeekView: View {
             .layoutPriority(1)
             .layoutProbe("peek.text", inside: "peek", checksText: true)
             Spacer(minLength: 0)
-            if let title = content.secondaryActionTitle {
-                Button { secondary?() } label: {
-                    Text(title)
-                        .lineLimit(1)
-                        .fixedSize()
-                        .font(.system(size: MelyType.body, weight: .semibold))
+            if !folded.isEmpty {
+                Menu {
+                    ForEach(folded) { action in Button(action.title) { run?(action.id) } }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: MelyType.body, weight: .bold))
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 12).padding(.vertical, 6)
-                        .background(.white.opacity(MelyFill.selected), in: Capsule())
-                        .contentShape(Capsule())
+                        .frame(width: 28, height: 28)
+                        .background(.white.opacity(MelyFill.selected), in: Circle())
+                        .contentShape(Circle())
                 }
-                .buttonStyle(.plain)
-                .layoutProbe("peek.secondary", row: "peek.buttons", inside: "peek", checksWhole: true)
+                .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+                .help("Ещё")
+                .accessibilityLabel("Ещё действия")
+                .layoutProbe("peek.more", row: "peek.buttons", inside: "peek", checksWhole: true)
             }
-            if let action = content.actionTitle {
-                // Never squeezed: the title gives way instead.
-                let label = Text(action)
-                    .lineLimit(1)
-                    .fixedSize()
-                    .font(.system(size: MelyType.body, weight: .semibold))
-                    .foregroundStyle(.black)
-                    .padding(.horizontal, 12).padding(.vertical, 6)
-                    .background(.white, in: Capsule())
-                    .layoutProbe("peek.action", row: "peek.buttons", inside: "peek", checksWhole: true)
-                if content.secondaryActionTitle != nil {
-                    Button { primary?() } label: { label.contentShape(Capsule()) }.buttonStyle(.plain)
-                } else {
-                    // The whole preview is the button.
-                    label.accessibilityAddTraits(.isButton)
-                }
+            ForEach(content.actions.filter { !folded.contains($0) }) { action in
+                button(action)
             }
             // A lasting preview (a reminder) closes with «×»; a passing one goes by itself.
             if content.lastsUntil != nil, let dismiss {
@@ -67,6 +56,47 @@ struct PeekView: View {
         }
         .foregroundStyle(.white)
         .frame(height: IslandPresentation.peekBodyHeight)
+    }
+
+    /// Never squeezed: the title gives way instead. A sole button is the whole preview.
+    @ViewBuilder private func button(_ action: PeekAction) -> some View {
+        let label = Text(action.title)
+            .lineLimit(1)
+            .fixedSize()
+            .font(.system(size: MelyType.body, weight: .semibold))
+            .foregroundStyle(action.isPrimary ? .black : .white)
+            .padding(.horizontal, 12).padding(.vertical, 6)
+            .background(action.isPrimary ? .white : .white.opacity(MelyFill.selected), in: Capsule())
+            .layoutProbe(Self.probe(action), row: "peek.buttons", inside: "peek", checksWhole: true)
+        if content.soleAction != nil {
+            label.accessibilityAddTraits(.isButton)
+        } else {
+            Button { run?(action.id) } label: { label.contentShape(Capsule()) }.buttonStyle(.plain)
+        }
+    }
+
+    private static func probe(_ action: PeekAction) -> String {
+        switch action.id {
+        case PeekAction.primaryId: "peek.action"
+        case PeekAction.secondaryId: "peek.secondary"
+        default: "peek.action.\(action.id)"
+        }
+    }
+
+    /// The title keeps at least this much beside the buttons.
+    static let minTextWidth: CGFloat = 150
+
+    /// What goes into «⋯»: the folding buttons, once all of them do not fit beside the
+    /// icon, «×» and `minTextWidth` of title.
+    static func folded(_ content: PeekContent) -> [PeekAction] {
+        let font = NSFont.systemFont(ofSize: MelyType.body, weight: .semibold)
+        func width(_ a: PeekAction) -> CGFloat {
+            (a.title as NSString).size(withAttributes: [.font: font]).width.rounded(.up) + 24 + 12
+        }
+        let close: CGFloat = content.lastsUntil != nil ? 22 + 12 : 0
+        let room = IslandPresentation.peekWidth - 2 * 16 - (30 + 12) - close - minTextWidth
+        guard content.actions.reduce(0, { $0 + width($1) }) > room else { return [] }
+        return content.actions.filter(\.folds)
     }
 
     /// The title; a reminder's counts down to its meeting. A long title gives way: the
@@ -109,6 +139,8 @@ struct PeekView: View {
         case .red: Color(red: 1.0, green: 0.38, blue: 0.35)
         case .yellow: Color(red: 0.95, green: 0.75, blue: 0.2)
         case .gray: Color(white: 0.6)
+        case .focus: MelyTint.focus
+        case .rest: MelyTint.rest
         }
     }
 }

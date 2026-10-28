@@ -161,6 +161,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         focus.onEvent = { [weak self] event in
             if event == .started { self?.island?.flashWings() }
         }
+        // «Перерыв окончен», «Фокус на паузе» stay until answered (`staysUntil`); «Фокус окончен»
+        // passes slowly (the card under Mely keeps its buttons), the rest quickly.
+        focus.peek = { [weak self] content in
+            self?.island?.showPeek(content, for: content.id == FocusPeeks.finishedId ? .seconds(12) : .seconds(6))
+        }
+        focus.dismissPeek = { [weak self] in self?.island?.dismissPeek($0) }
+        focus.completeTask = { [weak self] id in self?.reminders.setCompleted(id, true) }
         nowPlaying.peek = { [weak self] in self?.island?.showPeek($0, for: .seconds(4)) }
         reminders.peek = { [weak self] in self?.island?.showPeek($0, for: .seconds(4)) }
         calendar.peek = { [weak self] content in
@@ -169,7 +176,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         calendar.dismissPeek = { [weak self] id in self?.island?.dismissPeek(id) }
         calendar.joined = { [weak self] in self?.telemetry.count(.meetingJoined) }
-        island?.onPeekDismiss = { [weak self] id in self?.calendar.forgetPeek(id) }
+        island?.onPeekDismiss = { [weak self] id in
+            self?.calendar.forgetPeek(id)
+            self?.focus.forgetPeek(id)
+        }
+        island?.onPeekChoice = { [weak self] peekId, actionId in
+            if peekId.hasPrefix(FocusPeeks.prefix) { self?.focus.runPeekAction(peekId, actionId) }
+        }
         island?.onPeekAction = { [weak self] id in
             guard let self else { return }
             if id.hasPrefix(Self.updatePeekPrefix) {

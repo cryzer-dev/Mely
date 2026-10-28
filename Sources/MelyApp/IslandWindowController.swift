@@ -56,8 +56,8 @@ final class IslandWindowController {
                                   header: header)
             .onTapGesture { [weak machine, weak self, presentation] in
                 // A preview with a button: the whole preview is the button.
-                if presentation.mode == .peek, let peek = presentation.peek, peek.actionTitle != nil, peek.secondaryActionTitle == nil {
-                    self?.onPeekAction?(peek.id)
+                if presentation.mode == .peek, let peek = presentation.peek, let action = peek.soleAction {
+                    self?.route(peek.id, action.id)
                     if self?.lasting?.id == peek.id { self?.endLasting() }
                     presentation.peek = nil
                     presentation.mode = machine?.state == .hidden ? .hidden : .compact
@@ -183,6 +183,17 @@ final class IslandWindowController {
     var onPeekAction: ((String) -> Void)?
     /// The second button of a preview ("+1 ч" on a task), by its id.
     var onPeekSecondary: ((String) -> Void)?
+    /// Any other button of a preview: the preview's id, the action's id.
+    var onPeekChoice: ((String, String) -> Void)?
+
+    /// A preview's button to whoever handles it.
+    private func route(_ peekId: String, _ actionId: String) {
+        switch actionId {
+        case PeekAction.primaryId: onPeekAction?(peekId)
+        case PeekAction.secondaryId: onPeekSecondary?(peekId)
+        default: onPeekChoice?(peekId, actionId)
+        }
+    }
     /// Opens what a message preview points at; false lets the island just open the app.
     var onPeekOpen: ((String) -> Bool)?
 
@@ -219,14 +230,9 @@ final class IslandWindowController {
             }
         }
         presentation.dismissPeek = { [weak self] in self?.closePeek() }
-        presentation.peekSecondaryAction = { [weak self] in
+        presentation.runPeekAction = { [weak self] actionId in
             guard let self, self.presentation.mode == .peek, let peek = self.presentation.peek else { return }
-            self.onPeekSecondary?(peek.id)
-            self.closePeek()
-        }
-        presentation.peekPrimaryAction = { [weak self] in
-            guard let self, self.presentation.mode == .peek, let peek = self.presentation.peek else { return }
-            self.onPeekAction?(peek.id)
+            self.route(peek.id, actionId)
             self.closePeek()
         }
         // Over a full-screen app previews stay away; a reminder comes back after it.

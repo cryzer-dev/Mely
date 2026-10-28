@@ -20,10 +20,9 @@ public final class IslandPresentation {
     public var isDropTargeted = false
     /// The «×» of a lasting preview (a meeting reminder).
     @ObservationIgnored public var dismissPeek: (() -> Void)?
-    /// The preview's second button.
-    @ObservationIgnored public var peekSecondaryAction: (() -> Void)?
-    /// The main button of a preview with two (a click elsewhere on it only opens the island).
-    @ObservationIgnored public var peekPrimaryAction: (() -> Void)?
+    /// A button of the preview, by its action id. With more than one button, a click
+    /// elsewhere on the preview only opens the island.
+    @ObservationIgnored public var runPeekAction: ((String) -> Void)?
 
     /// The open island at its largest (four sessions and the limits); shorter pages make it
     /// shorter (`contentHeight`).
@@ -77,6 +76,27 @@ public final class IslandPresentation {
     public static let panelSize = CGSize(width: expandedSize.width + 40, height: expandedSize.height + 40)
 }
 
+/// A button on a preview.
+public struct PeekAction: Identifiable, Equatable, Sendable {
+    /// The ids of `actionTitle` and `secondaryActionTitle`.
+    public static let primaryId = "primary"
+    public static let secondaryId = "secondary"
+
+    public var id: String
+    public var title: String
+    /// White, the rest are quieter.
+    public var isPrimary: Bool
+    /// Goes into «⋯» when the buttons do not fit beside the title.
+    public var folds: Bool
+
+    public init(id: String, title: String, isPrimary: Bool = false, folds: Bool = false) {
+        self.id = id
+        self.title = title
+        self.isPrimary = isPrimary
+        self.folds = folds
+    }
+}
+
 /// A peek card: an icon, a title and one line.
 public struct PeekContent: Equatable, Sendable {
     public var id: String
@@ -88,11 +108,13 @@ public struct PeekContent: Equatable, Sendable {
     public var appBundleId: String?
     /// A click opens that app instead of expanding the island (a mirrored message).
     public var opensApp = false
-    /// A button on the right ("Подключиться"); a click runs the action registered for `id`.
-    public var actionTitle: String?
+    /// The buttons, left to right; the primary one last. One button alone: a click anywhere
+    /// on the preview is that button.
+    public var actions: [PeekAction]
+    /// The main button ("Подключиться"); a click runs the action registered for `id`.
+    public var actionTitle: String? { actions.first { $0.id == PeekAction.primaryId }?.title }
     /// A second, quieter button before it ("+1 ч"); a click runs the owner's second action.
-    /// With it, the main action is its own button, not a click anywhere on the preview.
-    public var secondaryActionTitle: String?
+    public var secondaryActionTitle: String? { actions.first { $0.id == PeekAction.secondaryId }?.title }
     /// A lasting preview that gives way to a lasting one already up (a meeting): it passes
     /// over it like a short preview and the meeting comes back.
     public var yieldsToLasting = false
@@ -105,20 +127,29 @@ public struct PeekContent: Equatable, Sendable {
     /// When the reminder goes by itself (the event's end); nil: at `until`.
     public var staysUntil: Date?
 
+    /// False: a sole button is only itself, a click elsewhere opens the island (an action
+    /// that ends something, as «Закончить сейчас», is not run by a stray click).
+    public var tapRunsAction = true
+
+    /// The only button, which the whole preview is.
+    public var soleAction: PeekAction? { actions.count == 1 && tapRunsAction ? actions[0] : nil }
+
     /// When a lasting preview runs out; nil for a passing one.
     public var lastsUntil: Date? { staysUntil ?? until }
 
-    public enum Tint: Sendable { case blue, green, orange, red, yellow, gray }
+    public enum Tint: Sendable { case blue, green, orange, red, yellow, gray, focus, rest }
 
     public init(id: String, symbol: String, tint: Tint, title: String, subtitle: String, appBundleId: String? = nil,
-                opensApp: Bool = false, actionTitle: String? = nil, secondaryActionTitle: String? = nil, artwork: Data? = nil,
+                opensApp: Bool = false, actionTitle: String? = nil, secondaryActionTitle: String? = nil,
+                actions: [PeekAction] = [], artwork: Data? = nil,
                 until: Date? = nil, staysUntil: Date? = nil, yieldsToLasting: Bool = false) {
         self.until = until
-        self.secondaryActionTitle = secondaryActionTitle
         self.yieldsToLasting = yieldsToLasting
         self.staysUntil = staysUntil
         self.opensApp = opensApp
-        self.actionTitle = actionTitle
+        self.actions = actions
+            + [secondaryActionTitle.map { PeekAction(id: PeekAction.secondaryId, title: $0) },
+               actionTitle.map { PeekAction(id: PeekAction.primaryId, title: $0, isPrimary: true) }].compactMap { $0 }
         self.artwork = artwork
         self.id = id
         self.symbol = symbol

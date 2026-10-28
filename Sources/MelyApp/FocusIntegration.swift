@@ -3,6 +3,7 @@ import CoreGraphics
 import Observation
 import OSLog
 import MelyCore
+import MelyUI
 
 private let logger = Logger(subsystem: "dev.mely.app", category: "focus")
 
@@ -30,6 +31,13 @@ final class FocusIntegration: Integration {
     @ObservationIgnored var onEvent: ((FocusEvent) -> Void)?
     /// The next meeting starting between now and the end, for «Через 5 мин — …».
     @ObservationIgnored var nextMeeting: ((_ after: Date, _ before: Date) -> FocusMeeting?)?
+    /// Previews under the notch («Фокус окончен», «Перерыв окончен», …) and taking one away.
+    @ObservationIgnored var peek: ((PeekContent) -> Void)?
+    @ObservationIgnored var dismissPeek: ((String) -> Void)?
+    /// «Задача готова»: the task is marked done in Reminders.
+    @ObservationIgnored var completeTask: ((String) -> Void)?
+    /// Previews shown and not yet taken away.
+    @ObservationIgnored private var shownPeeks: Set<String> = []
     @ObservationIgnored private var ticker: Timer?
     @ObservationIgnored private var hotKey: GlobalHotKey?
     @ObservationIgnored private var observers: [(NotificationCenter, NSObjectProtocol)] = []
@@ -103,6 +111,7 @@ final class FocusIntegration: Integration {
         timer.save()
         ticksSinceSave = 0
         updateTicker()
+        dismissStalePeeks()
     }
 
     /// Once a second, only while a session or a break runs.
@@ -136,7 +145,10 @@ final class FocusIntegration: Integration {
             timer.save()
             ticksSinceSave = 0
         }
-        if !events.isEmpty { updateTicker() }
+        if !events.isEmpty {
+            updateTicker()
+            dismissStalePeeks()
+        }
     }
 
     private func handle(_ event: FocusEvent) {
@@ -144,17 +156,79 @@ final class FocusIntegration: Integration {
         case .started:
             logger.info("focus started")
             if settings.playsStartSound { SoundEngine.shared.play(.focusStart) }
-        case .finished:
+        case let .finished(worked):
             logger.info("focus finished")
             if settings.playsEndSound { SoundEngine.shared.play(.focusEnd) }
+            if settings.autoStartsBreak {
+                takeBreak()
+                if timer.phase == .onBreak { show(FocusPeeks.breakStarted(length: timer.breakLength, worked: worked)) }
+            } else {
+                show(FocusPeeks.finished(worked: worked, task: timer.task?.title))
+            }
+        case .breakOver:
+            if settings.autoStartsNext {
+                continueFocus()
+            } else {
+                show(FocusPeeks.breakOver(duration: timer.duration, task: timer.task?.title))
+            }
+        case let .returned(away):
+            show(FocusPeeks.away(away))
+        case let .meetingSoon(meeting):
+            show(FocusPeeks.meeting(meeting))
         case let .record(record):
             log?.add(record)
         case .autoPaused:
             logger.info("focus paused: away")
-        default:
+        case .breakStarted:
             break
         }
         onEvent?(event)
+    }
+
+    // MARK: Previews
+
+    private func show(_ content: PeekContent) {
+        shownPeeks.insert(content.id)
+        peek?(content)
+    }
+
+    /// A preview whose moment passed goes: «Фокус окончен» once the break began (from the
+    /// card, say), «Фокус на паузе» once resumed, a meeting's once the session ended.
+    private func dismissStalePeeks() {
+        let current: String? = switch timer.phase {
+        case .finished: FocusPeeks.finishedId
+        case .onBreak: FocusPeeks.breakId
+        case .breakOver: FocusPeeks.breakOverId
+        case .paused(.away), .paused(.locked): FocusPeeks.awayId
+        default: nil
+        }
+        for id in shownPeeks where id != current {
+            if id.hasPrefix(FocusPeeks.meetingId("")), timer.isRunning { continue }
+            dismissPeek?(id)
+            shownPeeks.remove(id)
+        }
+    }
+
+    /// A button of a focus preview.
+    func runPeekAction(_ peekId: String, _ actionId: String) {
+        shownPeeks.remove(peekId)
+        switch FocusPeeks.Action(rawValue: actionId) {
+        case .takeBreak: takeBreak()
+        case .more: extend(minutes: 10)
+        case .taskDone:
+            if let task = timer.task { completeTask?(task.id) }
+            takeBreak()
+        case .continueFocus: continueFocus()
+        case .resume: resume()
+        case .stop, .endNow: stopSession()
+        case .skip: skipBreak()
+        case nil: break
+        }
+    }
+
+    /// A preview went (closed, timed out).
+    func forgetPeek(_ id: String) {
+        shownPeeks.remove(id)
     }
 
     /// Since the last mouse or keyboard input, any app; needs no permission.
