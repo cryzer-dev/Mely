@@ -63,7 +63,7 @@ public struct FocusTimer: Codable, Equatable, Sendable {
     }
 
     public enum PauseReason: String, Codable, Sendable {
-        /// «Пауза» or ⌃⌥F; only the user lifts it.
+        /// «Пауза» or ⌃⌥P; only the user lifts it.
         case manual
         /// No input for a while.
         case away

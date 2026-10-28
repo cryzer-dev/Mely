@@ -5,7 +5,7 @@ import Observation
 @MainActor
 @Observable
 public final class FocusSettings {
-    /// ⌃⌥F and the first choice before anything was picked.
+    /// ⌃⌥P and the first choice before anything was picked.
     public var defaultMinutes: Int { didSet { save() } }
     /// The last length picked, offered first next time.
     public var lastPickedMinutes: Int? { didSet { save() } }
@@ -23,16 +23,18 @@ public final class FocusSettings {
     public var awayMinutes: Int { didSet { save() } }
     public var playsStartSound: Bool { didSet { save() } }
     public var playsEndSound: Bool { didSet { save() } }
-    /// Carbon virtual key code and modifiers; ⌃⌥F by default.
+    /// Carbon virtual key code and modifiers; ⌃⌥P by default.
     public var hotKeyCode: Int { didSet { save() } }
     public var hotKeyModifiers: Int { didSet { save() } }
+    /// Told after every change (the shortcut is registered again).
+    @ObservationIgnored public var changed: (() -> Void)?
 
     /// The picker's lengths, besides «Своё…».
     public static let choices = [25, 30, 40, 50]
     /// «Своё…» accepts this.
     public static let customRange = 5...180
-    /// `kVK_ANSI_F`, `controlKey | optionKey`.
-    public static let defaultHotKey = (code: 3, modifiers: 0x1000 | 0x0800)
+    /// `kVK_ANSI_P`, `controlKey | optionKey`: ⌃⌥F is taken by window managers (Rectangle).
+    public static let defaultHotKey = (code: 35, modifiers: 0x1000 | 0x0800)
 
     @ObservationIgnored private let defaults: UserDefaults
     private static let key = "focus"
@@ -80,5 +82,6 @@ public final class FocusSettings {
         ]
         if let lastPickedMinutes { values["last"] = lastPickedMinutes }
         defaults.set(values, forKey: Self.key)
+        changed?()
     }
 }

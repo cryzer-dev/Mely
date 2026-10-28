@@ -96,7 +96,7 @@ import Foundation
         #expect(settings.holdsMessages && settings.warnsMeetings && settings.pausesWhenAway)
         #expect(settings.awayAfter == 300)
         #expect(settings.playsStartSound && settings.playsEndSound)
-        #expect(settings.hotKeyCode == 3 && settings.hotKeyModifiers == 0x1800)
+        #expect(settings.hotKeyCode == 35 && settings.hotKeyModifiers == 0x1800)
         #expect(settings.pickerChoices == [25, 30, 40, 50])
 
         settings.lastPickedMinutes = 40

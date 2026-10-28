@@ -8,7 +8,7 @@ import MelyCore
 @MainActor
 final class SoundEngine {
     enum Sound: String, CaseIterable {
-        case greet, finish, approval, question, error, limit, drop, pop, poke, home, open, close, send
+        case greet, finish, approval, question, error, limit, drop, pop, poke, home, open, close, send, focusStart, focusEnd
     }
 
     static let shared = SoundEngine()

@@ -8,6 +8,8 @@ final class GlobalHotKey {
     private var ref: EventHotKeyRef?
     private var handler: EventHandlerRef?
     private let action: () -> Void
+    let keyCode: Int
+    let modifiers: Int
     /// Each shortcut has its own id: every handler sees every press and keeps only its own.
     private let number: UInt32
     private static var count: UInt32 = 0
@@ -15,6 +17,8 @@ final class GlobalHotKey {
     /// ⌃⌥Space by default.
     init(keyCode: Int = kVK_Space, modifiers: Int = controlKey | optionKey, action: @escaping () -> Void) {
         self.action = action
+        self.keyCode = keyCode
+        self.modifiers = modifiers
         Self.count += 1
         number = Self.count
         var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))

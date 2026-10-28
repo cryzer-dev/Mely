@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let calendar = CalendarIntegration()
     private let reminders = RemindersIntegration()
     private let nowPlaying = NowPlayingIntegration()
+    private let focus = FocusIntegration()
     private let tabs = IslandTabs()
     private let whatsNew = WhatsNewState()
     private let inboxSettings = InboxSettings()
@@ -154,6 +155,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         registry.register(calendar)
         registry.register(reminders)
         registry.register(nowPlaying)
+        registry.register(focus)
         nowPlaying.peek = { [weak self] in self?.island?.showPeek($0, for: .seconds(4)) }
         reminders.peek = { [weak self] in self?.island?.showPeek($0, for: .seconds(4)) }
         calendar.peek = { [weak self] content in

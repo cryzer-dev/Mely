@@ -77,4 +77,8 @@ mix("open", [noise_tick(0.0, 0.2), pluck(C6, 0.12, 0.0, 0.18)])
 mix("close", [noise_tick(0.0, 0.2), pluck(G5, 0.12, 0.0, 0.15)])
 # A sent chat message.
 mix("send", [pop(0.0, 0.4, 600, 1200, 0.06)])
+# A focus session starts: one soft low bell, settling in.
+mix("focusStart", [bell(G5 / 2, 1.2, 0.0, 0.4, decay=3.5), bell(D5, 1.0, 0.09, 0.22, decay=4)])
+# A focus session is over: a calm descending chime, not as bright as Claude's finish.
+mix("focusEnd", [bell(G5, 1.0, 0.0, 0.4, decay=4), bell(E5, 1.0, 0.16, 0.38, decay=4), bell(C5, 1.4, 0.32, 0.42, decay=3)])
 print("ok")
