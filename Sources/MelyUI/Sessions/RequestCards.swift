@@ -9,10 +9,13 @@ public struct RequestCard: View {
     let decide: (HookDecision) -> Void
     /// "Ответить в терминале": Claude Code asks there; the host comes forward.
     let answerInTerminal: () -> Void
+    /// Snapshots: a question's list scrolled to its end.
+    let scrolledToEnd: Bool
 
-    public init(request: PendingRequest, position: Int, total: Int,
+    public init(request: PendingRequest, position: Int, total: Int, scrolledToEnd: Bool = false,
                 decide: @escaping (HookDecision) -> Void, answerInTerminal: @escaping () -> Void) {
         self.request = request
+        self.scrolledToEnd = scrolledToEnd
         self.position = position
         self.total = total
         self.decide = decide
@@ -38,7 +41,7 @@ public struct RequestCard: View {
                 ApprovalBody(title: title, detail: detail, canAlways: canAlways,
                              decide: decide, answerInTerminal: answerInTerminal)
             case .question(let payload):
-                QuestionBody(payload: payload, decide: decide, answerInTerminal: answerInTerminal)
+                QuestionBody(payload: payload, scrolledToEnd: scrolledToEnd, decide: decide, answerInTerminal: answerInTerminal)
                     .id(request.id)  // fresh selection for every question card
             }
         }
@@ -91,6 +94,7 @@ private struct ApprovalBody: View {
 
 private struct QuestionBody: View {
     let payload: QuestionPayload
+    var scrolledToEnd = false
     let decide: (HookDecision) -> Void
     let answerInTerminal: () -> Void
     /// Chosen labels per question index.
@@ -99,12 +103,19 @@ private struct QuestionBody: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    ForEach(Array(payload.questions.enumerated()), id: \.offset) { index, question in
-                        questionView(index, question)
+            ScrollViewReader { scroll in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(Array(payload.questions.enumerated()), id: \.offset) { index, question in
+                            questionView(index, question)
+                        }
                     }
+                    // Room under the last field (the own answer) as tall as the fade: scrolled to
+                    // the end, nothing stays in it.
+                    .padding(.bottom, 36)
+                    Color.clear.frame(height: 1).id("end")
                 }
+                .onAppear { if scrolledToEnd { scroll.scrollTo("end", anchor: .bottom) } }
             }
             .frame(maxHeight: .infinity)
             // More options below: they fade out at the edge instead of being cut.

@@ -20,6 +20,11 @@ public struct ClaudeSession: Identifiable, Equatable, Sendable {
     public var state: SessionState = .idle
     /// Current ticker line ("Правит · Cart.tsx").
     public var step: String?
+    /// What the user asked in this turn, on one line.
+    public var prompt: String?
+    /// Claude's last message in full (from `Stop`): the notch shows it, so a question Claude
+    /// ends its turn with can be read without the terminal. Cleared by the next prompt.
+    public var lastMessage: String?
     /// Files changed in the current turn, newest last.
     public var diffs: [FileDiff] = []
     public var subagents = 0
@@ -30,6 +35,14 @@ public struct ClaudeSession: Identifiable, Equatable, Sendable {
     public var addedLines: Int { diffs.reduce(0) { $0 + $1.added } }
     public var removedLines: Int { diffs.reduce(0) { $0 + $1.removed } }
     public var lastDiff: FileDiff? { diffs.last }
+
+    /// The turn is over and Claude's last words end in a question: it waits for a reply.
+    public var asksBack: Bool {
+        switch state {
+        case .idle, .finished: lastMessage?.trimmingCharacters(in: .whitespacesAndNewlines).hasSuffix("?") == true
+        default: false
+        }
+    }
 }
 
 /// Live Claude Code sessions, one entry per session id, so two projects in the same
@@ -85,6 +98,8 @@ public final class SessionStore {
         case .userPrompt(let prompt):
             s.state = .thinking
             s.step = prompt.isEmpty ? nil : StepLabel.oneLine(prompt)
+            s.prompt = prompt.isEmpty ? nil : StepLabel.oneLine(prompt, limit: 200)
+            s.lastMessage = nil
             s.diffs = []
         case .toolStarted(let tool, let input):
             guard tool != "AskUserQuestion" else { break }
@@ -110,6 +125,9 @@ public final class SessionStore {
             }
         case .stop(let lastMessage):
             s.state = .finished(summary: lastMessage.map { DiffEngine.toOneLine($0, maxChars: 140) } ?? "")
+            let message = lastMessage?.trimmingCharacters(in: .whitespacesAndNewlines)
+            // A very long answer is cut: the notch is for reading the gist and the question.
+            s.lastMessage = message.flatMap { $0.isEmpty ? nil : String($0.prefix(4000)) }
             s.subagents = 0
         case .stopFailure(let message):
             s.state = Self.isRateLimit(message ?? "") ? .rateLimited : .error(message ?? "Ошибка")

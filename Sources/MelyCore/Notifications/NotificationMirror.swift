@@ -73,10 +73,13 @@ public enum MirrorDecision: Equatable, Sendable {
     case collect
     case preview(title: String, text: String)
 
-    public static func decide(_ n: MirroredNotification, apps: Set<String>, hideText: Bool,
+    /// - Parameter suppressed: apps Mely shows itself right now (Reminders while the tasks
+    ///   remind under the notch): never mirrored, so nothing comes twice.
+    public static func decide(_ n: MirroredNotification, apps: Set<String>, suppressed: Set<String> = [], hideText: Bool,
                               quietInFocus: Bool, focusOn: Bool, appName: String) -> MirrorDecision {
         // The database keeps bundle ids lowercased ("com.apple.scripteditor2").
-        guard apps.contains(where: { $0.caseInsensitiveCompare(n.bundleId) == .orderedSame }) else { return .ignore }
+        func has(_ ids: Set<String>) -> Bool { ids.contains { $0.caseInsensitiveCompare(n.bundleId) == .orderedSame } }
+        guard has(apps), !has(suppressed) else { return .ignore }
         if quietInFocus && focusOn { return .collect }
         let title = n.title ?? appName
         if hideText { return .preview(title: title, text: n.subtitle.map { "\(appName) · \($0)" } ?? "Новое уведомление") }

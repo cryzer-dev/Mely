@@ -345,13 +345,15 @@ private struct TaskRow<MenuItems: View>: View {
                         .strikethrough(item.isCompleted)
                         .lineLimit(1).truncationMode(.tail)
                 }
-                let due = item.due.flatMap { TaskBoard.rowLabel($0, now: now) }
+                let due = item.due.flatMap { TaskBoard.rowLabel($0, estimate: item.estimate, now: now) }
+                // "11:00–11:30" already says how long.
+                let blockShown = item.due?.hasTime == true && !overdue && item.estimate != nil && item.estimate != .overHour
                 if due != nil || item.estimate != nil || !item.tags.isEmpty || showsList {
                     HStack(spacing: 5) {
                         if let due {
                             Text(due).foregroundStyle(overdue ? MelyTint.error : .white.opacity(MelyInk.secondary)).fixedSize()
                         }
-                        if let estimate = item.estimate {
+                        if let estimate = item.estimate, !blockShown {
                             Text(estimate.label).foregroundStyle(.white.opacity(MelyInk.secondary)).fixedSize()
                         }
                         ForEach(item.tags, id: \.self) { tag in

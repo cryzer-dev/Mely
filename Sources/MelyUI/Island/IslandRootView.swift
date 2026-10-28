@@ -69,7 +69,8 @@ public struct IslandRootView<Compact: View, Expanded: View, Header: View>: View 
                     .transition(.islandContent)
                 case .peek:
                     if let peek = presentation.peek {
-                        PeekView(content: peek, dismiss: presentation.dismissPeek)
+                        PeekView(content: peek, dismiss: presentation.dismissPeek, primary: presentation.peekPrimaryAction,
+                                 secondary: presentation.peekSecondaryAction)
                             .layoutProbe("peek", inside: "island")
                             .padding(.top, presentation.geometry.height)
                             .padding(.horizontal, 16)

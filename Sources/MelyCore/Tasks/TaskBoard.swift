@@ -197,8 +197,16 @@ public struct TaskBoard: Equatable, Sendable {
         return "\(day), \(time(date, calendar: calendar))"
     }
 
-    /// The due in a row whose group already names the day: the time, or "просрочено · 24 окт".
-    public static func rowLabel(_ due: TaskDue, now: Date, calendar: Calendar = .current) -> String? {
+    /// A time with an estimate is a block of the day, "11:00–11:30" (when to start, how
+    /// long); without one, the moment "15:00". A day without a time is a deadline: by then.
+    public static func timeLabel(_ date: Date, estimate: TaskEstimate?, calendar: Calendar = .current) -> String {
+        guard let estimate, estimate != .overHour else { return time(date, calendar: calendar) }
+        return "\(time(date, calendar: calendar))–\(time(date.addingTimeInterval(TimeInterval(estimate.minutes * 60)), calendar: calendar))"
+    }
+
+    /// The due in a row whose group already names the day: the time (a block with an
+    /// estimate), or "просрочено · 24 окт".
+    public static func rowLabel(_ due: TaskDue, estimate: TaskEstimate? = nil, now: Date, calendar: Calendar = .current) -> String? {
         if due.isOverdue(now: now, calendar: calendar) {
             let dayStart = due.dayStart(calendar: calendar)
             let today = calendar.startOfDay(for: now)
@@ -206,8 +214,15 @@ public struct TaskBoard: Equatable, Sendable {
             if dayStart == today, case let .time(date) = due { return "просрочено · \(time(date, calendar: calendar))" }
             return "просрочено · \(dayLabel(dayStart, now: now, calendar: calendar))"
         }
-        if case let .time(date) = due { return time(date, calendar: calendar) }
+        if case let .time(date) = due { return timeLabel(date, estimate: estimate, calendar: calendar) }
         return nil
+    }
+
+    /// Under a due reminder: "11:00–11:30 · ~30 мин" for a block, "в 15:00" for a moment.
+    public static func reminderLabel(_ date: Date, estimate: TaskEstimate?, calendar: Calendar = .current) -> String {
+        guard let estimate else { return "в \(time(date, calendar: calendar))" }
+        if estimate == .overHour { return "с \(time(date, calendar: calendar)) · \(estimate.label)" }
+        return "\(timeLabel(date, estimate: estimate, calendar: calendar)) · \(estimate.label)"
     }
 
     public static func dayLabel(_ day: Date, now: Date, calendar: Calendar = .current) -> String {

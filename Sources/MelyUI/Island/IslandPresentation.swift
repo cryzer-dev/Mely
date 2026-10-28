@@ -20,6 +20,10 @@ public final class IslandPresentation {
     public var isDropTargeted = false
     /// The «×» of a lasting preview (a meeting reminder).
     @ObservationIgnored public var dismissPeek: (() -> Void)?
+    /// The preview's second button.
+    @ObservationIgnored public var peekSecondaryAction: (() -> Void)?
+    /// The main button of a preview with two (a click elsewhere on it only opens the island).
+    @ObservationIgnored public var peekPrimaryAction: (() -> Void)?
 
     /// The open island at its largest (four sessions and the limits); shorter pages make it
     /// shorter (`contentHeight`).
@@ -86,6 +90,12 @@ public struct PeekContent: Equatable, Sendable {
     public var opensApp = false
     /// A button on the right ("Подключиться"); a click runs the action registered for `id`.
     public var actionTitle: String?
+    /// A second, quieter button before it ("+1 ч"); a click runs the owner's second action.
+    /// With it, the main action is its own button, not a click anywhere on the preview.
+    public var secondaryActionTitle: String?
+    /// A lasting preview that gives way to a lasting one already up (a meeting): it passes
+    /// over it like a short preview and the meeting comes back.
+    public var yieldsToLasting = false
     /// A cover replaces the icon (a new track).
     public var artwork: Data?
     /// An event reminder: the event's start, counted down after the title ("через 4 мин",
@@ -101,9 +111,11 @@ public struct PeekContent: Equatable, Sendable {
     public enum Tint: Sendable { case blue, green, orange, red, yellow, gray }
 
     public init(id: String, symbol: String, tint: Tint, title: String, subtitle: String, appBundleId: String? = nil,
-                opensApp: Bool = false, actionTitle: String? = nil, artwork: Data? = nil, until: Date? = nil,
-                staysUntil: Date? = nil) {
+                opensApp: Bool = false, actionTitle: String? = nil, secondaryActionTitle: String? = nil, artwork: Data? = nil,
+                until: Date? = nil, staysUntil: Date? = nil, yieldsToLasting: Bool = false) {
         self.until = until
+        self.secondaryActionTitle = secondaryActionTitle
+        self.yieldsToLasting = yieldsToLasting
         self.staysUntil = staysUntil
         self.opensApp = opensApp
         self.actionTitle = actionTitle

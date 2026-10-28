@@ -115,7 +115,7 @@ struct TodayTasksBlock: View {
                     .strikethrough(item.isCompleted)
                     .lineLimit(1).truncationMode(.tail)
                 Spacer(minLength: 6)
-                if let due = item.due.flatMap({ TaskBoard.rowLabel($0, now: now) }) {
+                if let due = item.due.flatMap({ TaskBoard.rowLabel($0, estimate: item.estimate, now: now) }) {
                     Text(due).font(.system(size: MelyType.caption))
                         .foregroundStyle(overdue ? MelyTint.error : .white.opacity(MelyInk.secondary))
                         .fixedSize()
@@ -142,13 +142,16 @@ struct TimelineTaskRow: View {
     var body: some View {
         let due = item.due?.date() ?? now
         let late = !item.isCompleted && due < now
+        let end = item.estimate.flatMap { $0 == .overHour ? nil : due.addingTimeInterval(TimeInterval($0.minutes * 60)) }
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 1) {
                 Text(due.formatted(date: .omitted, time: .shortened)).font(.system(size: MelyType.body, weight: .semibold))
                     .monospacedDigit()
                     .foregroundStyle(late ? MelyTint.error : .white)
-                // Always two lines, as an event's start and end: rows of the day are one height.
-                Text(item.estimate?.label ?? " ").font(.system(size: MelyType.caption))
+                // With an estimate it is a block, start and end like an event; without one, a
+                // moment. Always two lines: rows of the day are one height.
+                Text(end.map { $0.formatted(date: .omitted, time: .shortened) } ?? " ").font(.system(size: MelyType.caption))
+                    .monospacedDigit()
                     .foregroundStyle(.white.opacity(MelyInk.tertiary))
                     .lineLimit(1)
             }
@@ -172,7 +175,8 @@ struct TimelineTaskRow: View {
                     .strikethrough(item.isCompleted)
                     .lineLimit(1).truncationMode(.tail)
                 Spacer(minLength: 6)
-                Text("задача").font(.system(size: MelyType.caption)).foregroundStyle(.white.opacity(MelyInk.tertiary)).fixedSize()
+                Text(["задача", item.estimate?.label].compactMap { $0 }.joined(separator: " · "))
+                    .font(.system(size: MelyType.caption)).foregroundStyle(.white.opacity(MelyInk.tertiary)).fixedSize()
             }
             .contentShape(Rectangle())
             .onTapGesture { open(item.id) }

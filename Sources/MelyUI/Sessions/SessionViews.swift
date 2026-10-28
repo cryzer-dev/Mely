@@ -70,59 +70,130 @@ public struct DiffCounts: View {
 public struct SessionRow: View {
     let session: ClaudeSession
     let open: () -> Void
+    /// Claude's last message unfolded in full.
+    @State private var expanded: Bool
 
-    public init(session: ClaudeSession, open: @escaping () -> Void) {
+    public init(session: ClaudeSession, expanded: Bool = false, open: @escaping () -> Void) {
         self.session = session
         self.open = open
+        _expanded = State(initialValue: expanded)
     }
 
     public var body: some View {
-        HStack(spacing: 10) {
-            // The session's own little Mely, its host app as a badge.
-            SessionMely(session: session, size: 28)
-                .overlay(alignment: .bottomTrailing) {
-                    HostIcon(bundleId: session.host.bundleId, size: 13).offset(x: 4, y: 3)
-                }
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    // One line whatever the name: the row never grows (task 7.10).
-                    Text(session.projectName).font(.system(size: MelyType.title, weight: .semibold))
-                        .lineLimit(1).truncationMode(.middle)
-                    Text(session.host.name).font(.system(size: MelyType.footnote)).foregroundStyle(.white.opacity(MelyInk.secondary))
-                        .lineLimit(1).fixedSize()
-                    if session.subagents > 0 {
-                        Text("+\(session.subagents) агент").font(.system(size: MelyType.caption, weight: .medium))
-                            .padding(.horizontal, 5).padding(.vertical, 1)
-                            .background(.white.opacity(MelyFill.raised), in: Capsule())
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                // The session's own little Mely, its host app as a badge.
+                SessionMely(session: session, size: 28)
+                    .overlay(alignment: .bottomTrailing) {
+                        HostIcon(bundleId: session.host.bundleId, size: 13).offset(x: 4, y: 3)
+                    }
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        // One line whatever the name: the row never grows (task 7.10).
+                        Text(session.projectName).font(.system(size: MelyType.title, weight: .semibold))
+                            .lineLimit(1).truncationMode(.middle)
+                        Text(session.host.name).font(.system(size: MelyType.footnote)).foregroundStyle(.white.opacity(MelyInk.secondary))
+                            .lineLimit(1).fixedSize()
+                        if session.subagents > 0 {
+                            Text("+\(session.subagents) агент").font(.system(size: MelyType.caption, weight: .medium))
+                                .padding(.horizontal, 5).padding(.vertical, 1)
+                                .background(.white.opacity(MelyFill.raised), in: Capsule())
+                        }
+                    }
+                    if let message = shownMessage, !expanded {
+                        // Claude's answer, not just "Готово": two lines, the rest a click away. A
+                        // question is what matters, and it comes last: then the last paragraph.
+                        Text(Self.inline(session.asksBack ? Self.lastParagraph(message) : message))
+                            .font(.system(size: MelyType.footnote))
+                            .foregroundStyle(.white.opacity(MelyInk.strong))
+                            .lineLimit(2)
+                            .contentShape(Rectangle())
+                            .onTapGesture { withAnimation(MelyMotion.tab) { expanded = true } }
+                            .help("Показать ответ целиком")
+                    } else {
+                        Text(detail)
+                            .font(.system(size: MelyType.footnote))
+                            .foregroundStyle(.white.opacity(MelyInk.strong))
+                            .lineLimit(1)
+                            .truncationMode(.middle)
                     }
                 }
-                Text(detail)
-                    .font(.system(size: MelyType.footnote))
-                    .foregroundStyle(.white.opacity(MelyInk.strong))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+                Spacer(minLength: 8)
+                if !session.diffs.isEmpty {
+                    DiffCounts(added: session.addedLines, removed: session.removedLines)
+                }
+                HStack(spacing: 5) {
+                    Circle().fill(stateColor).frame(width: 7, height: 7)
+                    Text(stateTitle).font(.system(size: MelyType.footnote, weight: .medium)).fixedSize()
+                }
+                .foregroundStyle(.white.opacity(MelyInk.primary))
+                if shownMessage != nil {
+                    Button { withAnimation(MelyMotion.tab) { expanded.toggle() } } label: {
+                        Image(systemName: "chevron.down").font(.system(size: MelyType.caption, weight: .bold))
+                            .rotationEffect(.degrees(expanded ? 180 : 0))
+                            .foregroundStyle(.white.opacity(MelyInk.secondary))
+                            .frame(width: 18, height: 18).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help(expanded ? "Свернуть ответ" : "Показать ответ целиком")
+                    .layoutProbe("session.expand.\(session.id)", inside: "session.row.\(session.id)")
+                }
+                Button("Открыть", action: open)
+                    .buttonStyle(.plain)
+                    .font(.system(size: MelyType.footnote, weight: .semibold))
+                    .padding(.horizontal, 10).padding(.vertical, 5)
+                    .background(.white.opacity(MelyFill.selected), in: Capsule())
+                    .fixedSize()
+                    .accessibilityLabel("Открыть \(session.projectName) в \(session.host.name)")
+                    .layoutProbe("session.open.\(session.id)", inside: "session.row.\(session.id)")
             }
-            Spacer(minLength: 8)
-            if !session.diffs.isEmpty {
-                DiffCounts(added: session.addedLines, removed: session.removedLines)
+            if expanded, let message = shownMessage {
+                ScrollViewReader { scroll in
+                    ScrollView(.vertical, showsIndicators: true) {
+                        Text(Self.inline(message))
+                            .font(.system(size: MelyType.footnote))
+                            .foregroundStyle(.white.opacity(MelyInk.primary))
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Color.clear.frame(height: 1).id("end")
+                    }
+                    // A question waits at the end: open there.
+                    .onAppear { if session.asksBack { scroll.scrollTo("end", anchor: .bottom) } }
+                }
+                .frame(maxHeight: 140)
+                .padding(.horizontal, 10).padding(.vertical, 8)
+                .background(.white.opacity(MelyFill.card), in: RoundedRectangle(cornerRadius: MelyRadius.medium))
+                .layoutProbe("session.message.\(session.id)", inside: "session.row.\(session.id)")
             }
-            HStack(spacing: 5) {
-                Circle().fill(SessionStateStyle.color(session.state)).frame(width: 7, height: 7)
-                Text(SessionStateStyle.title(session.state)).font(.system(size: MelyType.footnote, weight: .medium))
-            }
-            .foregroundStyle(.white.opacity(MelyInk.primary))
-            Button("Открыть", action: open)
-                .buttonStyle(.plain)
-                .font(.system(size: MelyType.footnote, weight: .semibold))
-                .padding(.horizontal, 10).padding(.vertical, 5)
-                .background(.white.opacity(MelyFill.selected), in: Capsule())
-                .accessibilityLabel("Открыть \(session.projectName) в \(session.host.name)")
-                .layoutProbe("session.open.\(session.id)", inside: "session.row.\(session.id)")
         }
         .foregroundStyle(.white)
         .padding(.horizontal, 12).padding(.vertical, 8)
         .background(.white.opacity(MelyFill.card), in: RoundedRectangle(cornerRadius: MelyRadius.large))
         .layoutProbe("session.row.\(session.id)", inside: "sessions.list")
+    }
+
+    /// Claude's last message, once the turn is over (while it works, the current step).
+    private var shownMessage: String? {
+        switch session.state {
+        case .idle, .finished: session.lastMessage
+        default: nil
+        }
+    }
+
+    private var stateTitle: String { session.asksBack ? "Ждёт ответа" : SessionStateStyle.title(session.state) }
+    private var stateColor: Color { session.asksBack ? MelyTint.question : SessionStateStyle.color(session.state) }
+
+    /// The last paragraph of a message: where Claude puts its question.
+    static func lastParagraph(_ message: String) -> String {
+        message.components(separatedBy: "\n\n").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .last { !$0.isEmpty } ?? message
+    }
+
+    /// Bold, code and links of a Markdown answer; the text as is when it does not parse.
+    static func inline(_ markdown: String) -> AttributedString {
+        (try? AttributedString(markdown: markdown, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
+            ?? AttributedString(markdown)
     }
 
     private var detail: String {

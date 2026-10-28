@@ -38,8 +38,17 @@ final class RemindersIntegration: Integration {
     @ObservationIgnored private var generation = 0
     /// Deleted in the notch, removed from Reminders 4 s later unless «Отменить».
     @ObservationIgnored private var pendingDeletes: [String: Task<Void, Never>] = [:]
-    /// Short notices under the notch ("Задача не найдена").
+    /// Short notices under the notch ("Задача не найдена") and due reminders.
     @ObservationIgnored var peek: ((PeekContent) -> Void)?
+    /// Due times already announced.
+    @ObservationIgnored private var schedule = TaskReminderSchedule()
+    /// Wakes at the next due time, so a reminder comes on the minute, not on the next tick.
+    @ObservationIgnored private var dueTask: Task<Void, Never>?
+    /// Due reminders' ids start with this; `AppDelegate` routes their buttons here.
+    static let duePrefix = "task-due-"
+    static let bundleId = "com.apple.reminders"
+    /// Whose banners the notification database keeps for Reminders: the app or its daemon.
+    static let notificationSources: Set<String> = [bundleId, "com.apple.remindd"]
 
     func start() async {
         guard EKEventStore.authorizationStatus(for: .reminder) == .fullAccess else {
@@ -67,6 +76,7 @@ final class RemindersIntegration: Integration {
         timer?.invalidate(); timer = nil
         reloadTask?.cancel()
         loadTask?.cancel()
+        dueTask?.cancel()
         store = nil
         items = []
         lists = []
@@ -119,7 +129,53 @@ final class RemindersIntegration: Integration {
             self.items = loaded.filter { self.pendingDeletes[$0.id] == nil }
             self.hasLoaded = true
             log.info("loaded \(loaded.count) tasks from \(shown.count) lists")
+            self.remindIfDue()
         }
+    }
+
+    // MARK: - Due reminders
+
+    /// Reminders for due times that have come, then a wake-up for the next one.
+    private func remindIfDue() {
+        dueTask?.cancel()
+        guard settings.remindsUnderNotch else { return }
+        let now = Date()
+        for item in schedule.due(items, now: now) { remind(item) }
+        let next = items.compactMap { item -> Date? in
+            guard !item.isCompleted, case let .time(date)? = item.due, date > now else { return nil }
+            return date
+        }.min()
+        guard let next else { return }
+        dueTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(next.timeIntervalSinceNow + 0.5))
+            guard !Task.isCancelled else { return }
+            self?.remindIfDue()
+        }
+    }
+
+    private func remind(_ item: TaskItem) {
+        guard case let .time(due)? = item.due else { return }
+        log.info("due reminder")
+        // "11:00–11:30 · ~30 мин" when to start and how long; "в 15:00" for a moment.
+        let when = TaskBoard.reminderLabel(due, estimate: item.estimate)
+        peek?(PeekContent(id: Self.duePrefix + item.id, symbol: "checklist", tint: .blue,
+                          title: item.title,
+                          subtitle: ([when] + (item.listTitle.isEmpty ? [] : [item.listTitle])).joined(separator: " · "),
+                          actionTitle: "Готово", secondaryActionTitle: "+1 ч",
+                          staysUntil: due.addingTimeInterval(10 * 60), yieldsToLasting: true))
+    }
+
+    /// «Готово» (or a click anywhere on the reminder).
+    func runPeekAction(_ id: String) {
+        guard id.hasPrefix(Self.duePrefix) else { return }
+        setCompleted(String(id.dropFirst(Self.duePrefix.count)), true)
+    }
+
+    /// «+1 ч»: the due time and its alarm an hour from now; the reminder comes again then.
+    func runPeekSecondary(_ id: String) {
+        guard id.hasPrefix(Self.duePrefix) else { return }
+        postponeHour(String(id.dropFirst(Self.duePrefix.count)))
+        remindIfDue()
     }
 
     /// The store stays on the main actor; EventKit answers on its own queue.
@@ -245,7 +301,7 @@ final class RemindersIntegration: Integration {
         let workspace = NSWorkspace.shared
         if let external = reminder(id)?.calendarItemExternalIdentifier,
            let url = URL(string: "x-apple-reminderkit://REMCDReminder/\(external)"), workspace.open(url) { return }
-        if let app = workspace.urlForApplication(withBundleIdentifier: "com.apple.reminders") {
+        if let app = workspace.urlForApplication(withBundleIdentifier: Self.bundleId) {
             workspace.openApplication(at: app, configuration: NSWorkspace.OpenConfiguration())
         }
     }

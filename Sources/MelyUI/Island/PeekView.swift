@@ -5,6 +5,8 @@ import MelyCore
 struct PeekView: View {
     let content: PeekContent
     var dismiss: (() -> Void)?
+    var primary: (() -> Void)?
+    var secondary: (() -> Void)?
 
     var body: some View {
         HStack(spacing: 12) {
@@ -17,19 +19,39 @@ struct PeekView: View {
             .layoutPriority(1)
             .layoutProbe("peek.text", inside: "peek", checksText: true)
             Spacer(minLength: 0)
+            if let title = content.secondaryActionTitle {
+                Button { secondary?() } label: {
+                    Text(title)
+                        .lineLimit(1)
+                        .fixedSize()
+                        .font(.system(size: MelyType.body, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                        .background(.white.opacity(MelyFill.selected), in: Capsule())
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .layoutProbe("peek.secondary", row: "peek.buttons", inside: "peek", checksWhole: true)
+            }
             if let action = content.actionTitle {
                 // Never squeezed: the title gives way instead.
-                Text(action)
+                let label = Text(action)
                     .lineLimit(1)
                     .fixedSize()
                     .font(.system(size: MelyType.body, weight: .semibold))
                     .foregroundStyle(.black)
                     .padding(.horizontal, 12).padding(.vertical, 6)
                     .background(.white, in: Capsule())
-                    .layoutProbe("peek.action", inside: "peek", checksWhole: true)
-                    .accessibilityAddTraits(.isButton)
+                    .layoutProbe("peek.action", row: "peek.buttons", inside: "peek", checksWhole: true)
+                if content.secondaryActionTitle != nil {
+                    Button { primary?() } label: { label.contentShape(Capsule()) }.buttonStyle(.plain)
+                } else {
+                    // The whole preview is the button.
+                    label.accessibilityAddTraits(.isButton)
+                }
             }
-            if content.until != nil, let dismiss {
+            // A lasting preview (a reminder) closes with «×»; a passing one goes by itself.
+            if content.lastsUntil != nil, let dismiss {
                 Button(action: dismiss) {
                     Image(systemName: "xmark")
                         .font(.system(size: MelyType.caption, weight: .bold))

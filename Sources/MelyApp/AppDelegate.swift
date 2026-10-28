@@ -165,12 +165,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             } else if id.hasPrefix(Self.updatedPeekPrefix) {
                 let version = String(id.dropFirst(Self.updatedPeekPrefix.count))
                 if let url = self.updateState.notesURL(for: version) { NSWorkspace.shared.open(url) }
+            } else if id.hasPrefix(RemindersIntegration.duePrefix) {
+                self.reminders.runPeekAction(id)
             } else {
                 self.calendar.runPeekAction(id)
             }
         }
+        island?.onPeekSecondary = { [weak self] id in self?.reminders.runPeekSecondary(id) }
         island?.onPeekOpen = { [weak self] id in self?.notifications.openPreview(id) ?? false }
         notifications.peek = { [weak self] in self?.island?.showPeek($0) }
+        // Mely reminds of due tasks itself: Reminders' own banners are not mirrored then.
+        notifications.suppressedApps = { [weak self] in
+            guard let reminders = self?.reminders, reminders.status == .running, reminders.settings.remindsUnderNotch else { return [] }
+            return RemindersIntegration.notificationSources
+        }
         island?.presentation.dropFiles = { [weak self] urls in self?.attachToChat(urls) }
         chatHotKey = GlobalHotKey { [weak self] in self?.openChat() }
         desktop.start()

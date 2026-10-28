@@ -141,6 +141,19 @@ private final class FixtureDB {
         #expect(decide(telegram, quiet: false, focus: true) == .preview(title: "Аня", text: "Созвон в 15?"))
     }
 
+    @Test func suppressedAppsAreNotMirrored() {
+        let reminder = MirroredNotification(id: 4, bundleId: "com.apple.remindd", title: "Созвон с бухгалтером", subtitle: nil,
+                                            body: nil, deliveredAt: Date())
+        let apps: Set<String> = ["com.apple.remindd", "ru.keepcoder.Telegram"]
+        #expect(MirrorDecision.decide(reminder, apps: apps, hideText: false, quietInFocus: false, focusOn: false, appName: "Напоминания")
+                == .preview(title: "Созвон с бухгалтером", text: "Напоминания"))
+        // Case does not matter, as for `apps`.
+        #expect(MirrorDecision.decide(reminder, apps: apps, suppressed: ["com.apple.Remindd"], hideText: false,
+                                      quietInFocus: false, focusOn: false, appName: "Напоминания") == .ignore)
+        #expect(MirrorDecision.decide(telegram, apps: apps, suppressed: ["com.apple.remindd"], hideText: false,
+                                      quietInFocus: false, focusOn: false, appName: "App") == .preview(title: "Аня", text: "Созвон в 15?"))
+    }
+
     @Test func settingsDefaultsAndPersistence() throws {
         let defaults = try #require(UserDefaults(suiteName: "mely-mirror-\(UUID().uuidString)"))
         let settings = NotificationMirrorSettings(defaults: defaults, installed: { $0 == "ru.keepcoder.Telegram" })

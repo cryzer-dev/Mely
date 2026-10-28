@@ -69,6 +69,16 @@ public enum LayoutMatrix {
             expanded("Sessions_StaleUsage", screen, .sessions, usage: .stale) {
                 Fixtures.sessionsPage(Fixtures.sessions(2), usage: Fixtures.usage(.stale))
             },
+            // Claude's question after the turn: two lines, unfolded, very long.
+            expanded("Sessions_Reply", screen, .sessions) {
+                Fixtures.sessionsPage(Fixtures.replySessions(), usage: Fixtures.usage(.normal))
+            },
+            expanded("Sessions_ReplyOpen", screen, .sessions) {
+                Fixtures.sessionsPage(Fixtures.replySessions(), expanded: "a")
+            },
+            expanded("Sessions_ReplyLongOpen", screen, .sessions) {
+                Fixtures.sessionsPage(Fixtures.replySessions(long: true), expanded: "a")
+            },
             expanded("Sessions_NoUsageData", screen, .sessions, usage: .none) {
                 Fixtures.sessionsPage(Fixtures.sessions(2), usage: Fixtures.usage(.none))
             },
@@ -237,6 +247,8 @@ public enum LayoutMatrix {
         [
             expanded("Request_Approval", screen, .sessions, held: true) { Fixtures.requestPage(question: false) },
             expanded("Request_Question", screen, .sessions, held: true) { Fixtures.requestPage(question: true) },
+            // Scrolled to the end: the own answer is whole, not lost in the fade.
+            expanded("Request_QuestionEnd", screen, .sessions, held: true) { Fixtures.requestPage(question: true, scrolledToEnd: true) },
         ]
     }
 
@@ -284,6 +296,14 @@ public enum LayoutMatrix {
                                       subtitle: "Mely анонимно считает, какими функциями пользуются чаще", actionTitle: "Отключить")),
             ("Updated", PeekContent(id: "updated-1.3.0", symbol: "sparkles", tint: .green, title: "Обновилась до 1.3.0",
                                     subtitle: "Посмотрите, что изменилось", actionTitle: "Что нового")),
+            // A task's due reminder: «+1 ч» and «Готово», «×»; a long name gives way to them.
+            ("TaskDue", PeekContent(id: "task-due-t", symbol: "checklist", tint: .blue,
+                                    title: "Созвон с бухгалтером по поводу квартальной отчётности и налогов",
+                                    subtitle: "15:00–15:30 · ~30 мин · Работа", actionTitle: "Готово", secondaryActionTitle: "+1 ч",
+                                    staysUntil: Date().addingTimeInterval(600), yieldsToLasting: true)),
+            ("TaskDueShort", PeekContent(id: "task-due-s", symbol: "checklist", tint: .blue, title: "Купить корм",
+                                         subtitle: "в 18:00 · Дом", actionTitle: "Готово", secondaryActionTitle: "+1 ч",
+                                         staysUntil: Date().addingTimeInterval(600), yieldsToLasting: true)),
             ("Message", PeekContent(id: "m", symbol: "bell.fill", tint: .blue, title: "Аня Смирнова",
                                     subtitle: "Созвон переносим на 15:30, ссылку кину в чат. Если не получится, давай завтра утром до стендапа, я весь день на встречах",
                                     appBundleId: "ru.keepcoder.Telegram", opensApp: true)),

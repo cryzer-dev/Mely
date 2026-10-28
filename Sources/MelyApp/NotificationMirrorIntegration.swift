@@ -31,6 +31,9 @@ final class NotificationMirrorIntegration: Integration {
     @ObservationIgnored private var pruneTimer: Timer?
     /// Shows a preview under the notch.
     @ObservationIgnored var peek: ((PeekContent) -> Void)?
+    /// Apps not to mirror right now; the app keeps it up to date (Reminders while the tasks
+    /// show their own due reminders).
+    @ObservationIgnored var suppressedApps: () -> Set<String> = { [] }
 
     var actions: [IntegrationAction] {
         guard status != .off else { return [] }
@@ -129,9 +132,10 @@ final class NotificationMirrorIntegration: Integration {
             fail(failure)
         case .success(let list):
             let focusOn = settings.quietInFocus && SystemFocus.isOn()
+            let suppressed = suppressedApps()
             for n in list {
                 let name = Self.appName(n.bundleId)
-                let decision = MirrorDecision.decide(n, apps: settings.apps, hideText: settings.hideText,
+                let decision = MirrorDecision.decide(n, apps: settings.apps, suppressed: suppressed, hideText: settings.hideText,
                                                      quietInFocus: settings.quietInFocus, focusOn: focusOn, appName: name)
                 // App and outcome only: never the text.
                 log.info("notification from \(n.bundleId, privacy: .public): \(String(describing: decision).prefix(8), privacy: .public)")

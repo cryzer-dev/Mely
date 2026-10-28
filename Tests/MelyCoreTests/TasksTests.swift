@@ -214,6 +214,12 @@ import Foundation
         #expect(TaskBoard.label(day(3), now: now, calendar: cal) == "пт")
         #expect(TaskBoard.label(day(16), now: now, calendar: cal) == "12 ноя")
         #expect(TaskBoard.rowLabel(.time(at(15)), now: now, calendar: cal) == "15:00")
+        // A time and an estimate: a block of the day. "1 ч+" has no end.
+        #expect(TaskBoard.rowLabel(.time(at(15)), estimate: .m30, now: now, calendar: cal) == "15:00–15:30")
+        #expect(TaskBoard.rowLabel(.time(at(15)), estimate: .overHour, now: now, calendar: cal) == "15:00")
+        #expect(TaskBoard.reminderLabel(at(11), estimate: .m30, calendar: cal) == "11:00–11:30 · ~30 мин")
+        #expect(TaskBoard.reminderLabel(at(11), estimate: .overHour, calendar: cal) == "с 11:00 · 1 ч+")
+        #expect(TaskBoard.reminderLabel(at(15), estimate: nil, calendar: cal) == "в 15:00")
         #expect(TaskBoard.rowLabel(day(0), now: now, calendar: cal) == nil)
         #expect(TaskBoard.rowLabel(.time(at(9.5)), now: now, calendar: cal) == "просрочено · 9:30")
         #expect(TaskBoard.rowLabel(day(-1), now: now, calendar: cal) == "просрочено · вчера")

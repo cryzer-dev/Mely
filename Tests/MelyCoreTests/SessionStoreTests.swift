@@ -36,6 +36,29 @@ import Foundation
         #expect(store.sessions.isEmpty)
     }
 
+    @Test func claudesAnswerOutlivesTheTurn() {
+        let store = SessionStore()
+        let o = origin("a", "/w/shop")
+        store.apply(.userPrompt("какой формат даты взять?"), origin: o, now: t0)
+        store.apply(.toolStarted(tool: "Read", input: JSONObject(["file_path": "/w/shop/Date.ts"])), origin: o, now: t0)
+        let question = "Есть два варианта:\n1. ISO 8601\n2. Локальный формат\n\nКакой выбрать?"
+        store.apply(.stop(lastMessage: question + "\n"), origin: o, now: t0)
+        #expect(store.session("a")?.lastMessage == question)
+        #expect(store.session("a")?.asksBack == true)
+        // Resting after «Готово», the answer and the question are still there.
+        store.settle("a")
+        #expect(store.session("a")?.state == .idle)
+        #expect(store.session("a")?.lastMessage == question)
+        #expect(store.session("a")?.asksBack == true)
+        #expect(store.session("a")?.prompt == "какой формат даты взять?")
+        // The next prompt starts a new turn.
+        store.apply(.userPrompt("ISO"), origin: o, now: t0)
+        #expect(store.session("a")?.lastMessage == nil)
+        #expect(store.session("a")?.asksBack == false)
+        store.apply(.stop(lastMessage: "Готово, перешёл на ISO."), origin: o, now: t0)
+        #expect(store.session("a")?.asksBack == false)
+    }
+
     @Test func approvalThenResume() {
         let store = SessionStore()
         let o = origin("a", "/w/shop")

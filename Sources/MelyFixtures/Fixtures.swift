@@ -159,13 +159,38 @@ public enum Fixtures {
         return store
     }
 
-    public static func sessionsPage(_ store: SessionStore, usage: PlanUsageStore? = nil) -> some View {
-        ClaudeOverview(store: store, queue: ApprovalQueue(), usage: usage, tabs: IslandTabs(),
-                       open: { _ in }, decide: { _, _ in }, answerInTerminal: { _ in })
+    /// Claude ended its turn with a question (rested since), next to a working session.
+    public static func replySessions(long: Bool = false) -> SessionStore {
+        let store = SessionStore()
+        let shop = origin("a", "/w/shop")
+        store.apply(.userPrompt("какой формат даты взять для API заказов?"), origin: shop)
+        let tail = long ? String(repeating: "\n\nЕщё одна деталь про часовые пояса, миграцию старых записей и обратную совместимость клиентов.", count: 6) : ""
+        store.apply(.stop(lastMessage: "Нашёл два места, где даты форматируются по-разному. Есть два варианта:\n1. **ISO 8601** везде — проще для клиентов\n2. Локальный формат — как сейчас в админке" + tail + "\n\nКакой выбрать?"),
+                    origin: shop)
+        store.settle("a")
+        store.apply(.toolStarted(tool: "Edit", input: JSONObject(["file_path": "/w/api/orders.ts"])), origin: origin("b", "/w/api"))
+        return store
+    }
+
+    public static func sessionsPage(_ store: SessionStore, usage: PlanUsageStore? = nil, expanded: String? = nil) -> some View {
+        Group {
+            if let expanded, let session = store.session(expanded) {
+                // An unfolded answer: the row as the list shows it, opened.
+                VStack(spacing: 6) {
+                    SessionRow(session: session, expanded: true) {}
+                    ForEach(store.sessions.filter { $0.id != expanded }) { SessionRow(session: $0) {} }
+                }
+                .layoutProbe("sessions.list", inside: "content", scrolls: true)
+                .frame(maxHeight: .infinity, alignment: .top)
+            } else {
+                ClaudeOverview(store: store, queue: ApprovalQueue(), usage: usage, tabs: IslandTabs(),
+                               open: { _ in }, decide: { _, _ in }, answerInTerminal: { _ in })
+            }
+        }
     }
 
     /// A WebStorm session asking, with a second request queued behind it.
-    public static func requestPage(question: Bool) -> some View {
+    public static func requestPage(question: Bool, scrolledToEnd: Bool = false) -> some View {
         let store = SessionStore()
         let queue = ApprovalQueue()
         let ws = origin("a", "/w/shop")
@@ -184,7 +209,15 @@ public enum Fixtures {
         let second: HookEvent = .permissionRequest(tool: "Edit", input: JSONObject(["file_path": "/w/admin/app.ts"]),
                                                    suggestions: JSONObject([:]))
         queue.enqueue(second, session: store.apply(second, origin: admin)!, responder: SampleResponder.make())
-        return ClaudeOverview(store: store, queue: queue, open: { _ in }, decide: { _, _ in }, answerInTerminal: { _ in })
+        return Group {
+            if scrolledToEnd, let current = queue.current {
+                // The card as the island shows it, its list scrolled down to the own answer.
+                RequestCard(request: current, position: 1, total: queue.requests.count, scrolledToEnd: true,
+                            decide: { _ in }, answerInTerminal: {})
+            } else {
+                ClaudeOverview(store: store, queue: queue, open: { _ in }, decide: { _, _ in }, answerInTerminal: { _ in })
+            }
+        }
     }
 
     // MARK: The chat

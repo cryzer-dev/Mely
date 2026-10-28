@@ -56,7 +56,7 @@ final class IslandWindowController {
                                   header: header)
             .onTapGesture { [weak machine, weak self, presentation] in
                 // A preview with a button: the whole preview is the button.
-                if presentation.mode == .peek, let peek = presentation.peek, peek.actionTitle != nil {
+                if presentation.mode == .peek, let peek = presentation.peek, peek.actionTitle != nil, peek.secondaryActionTitle == nil {
                     self?.onPeekAction?(peek.id)
                     if self?.lasting?.id == peek.id { self?.endLasting() }
                     presentation.peek = nil
@@ -181,6 +181,8 @@ final class IslandWindowController {
 
     /// Runs the action of a preview with a button (meeting reminder → join), by its id.
     var onPeekAction: ((String) -> Void)?
+    /// The second button of a preview ("+1 ч" on a task), by its id.
+    var onPeekSecondary: ((String) -> Void)?
     /// Opens what a message preview points at; false lets the island just open the app.
     var onPeekOpen: ((String) -> Bool)?
 
@@ -205,12 +207,28 @@ final class IslandWindowController {
     func showPeek(_ content: PeekContent, for duration: Duration = .seconds(5)) {
         var duration = duration
         if let end = content.lastsUntil {
-            // The next meeting's reminder takes over from one still running.
-            if lasting?.id != content.id { endLasting() }
-            lasting = content
-            duration = .seconds(max(1, end.timeIntervalSinceNow))
+            if content.yieldsToLasting, let current = lasting, current.id != content.id,
+               let until = current.lastsUntil, Date() < until {
+                // A task's reminder passes over a meeting's; the meeting comes back after it.
+                duration = .seconds(min(30, max(1, end.timeIntervalSinceNow)))
+            } else {
+                // The next meeting's reminder takes over from one still running.
+                if lasting?.id != content.id { endLasting() }
+                lasting = content
+                duration = .seconds(max(1, end.timeIntervalSinceNow))
+            }
         }
-        presentation.dismissPeek = { [weak self] in self?.dismissLasting() }
+        presentation.dismissPeek = { [weak self] in self?.closePeek() }
+        presentation.peekSecondaryAction = { [weak self] in
+            guard let self, self.presentation.mode == .peek, let peek = self.presentation.peek else { return }
+            self.onPeekSecondary?(peek.id)
+            self.closePeek()
+        }
+        presentation.peekPrimaryAction = { [weak self] in
+            guard let self, self.presentation.mode == .peek, let peek = self.presentation.peek else { return }
+            self.onPeekAction?(peek.id)
+            self.closePeek()
+        }
         // Over a full-screen app previews stay away; a reminder comes back after it.
         guard !yieldsToFullScreen, machine.state != .expanded && machine.state != .listening else { return }
         machine.reveal()
@@ -245,6 +263,18 @@ final class IslandWindowController {
         endLasting()
         guard presentation.mode == .peek, presentation.peek?.id == id else { return }
         peekTask?.cancel()
+        presentation.mode = machine.state == .hidden ? .hidden : .compact
+        presentation.peek = nil
+    }
+
+    /// «×» (or the second button) on the preview on screen: a lasting one ends; one passing
+    /// over it is told to its owner, and the lasting one comes back.
+    private func closePeek() {
+        guard presentation.mode == .peek, let peek = presentation.peek else { return dismissLasting() }
+        if lasting?.id == peek.id { return dismissLasting() }
+        onPeekDismiss?(peek.id)
+        peekTask?.cancel()
+        if showLastingIfAny() { return }
         presentation.mode = machine.state == .hidden ? .hidden : .compact
         presentation.peek = nil
     }
