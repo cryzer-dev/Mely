@@ -53,7 +53,18 @@ public struct MelyCharacter: NSViewRepresentable {
 /// Redraws while it is in a visible window and stops otherwise: 60 times a second while
 /// the eyes travel, 12 once they rest.
 public final class MelyCharacterView: NSView {
-    var pose: CharacterPose = .idle { didSet { updateLabel() } }
+    var pose: CharacterPose = .idle {
+        didSet {
+            updateLabel()
+            guard pose != oldValue else { return }
+            // A new pose moves (a hop when glad): smooth frames while it settles in.
+            poseChangedAt = Date.timeIntervalSinceReferenceDate
+            if !isFast { schedule(fast: true) }
+        }
+    }
+    /// When the pose last changed; the first `poseSettle` seconds after it run at 60 fps.
+    private var poseChangedAt: TimeInterval = 0
+    private static let poseSettle: TimeInterval = 2
     var look: MelyCharacter.Look = .pointer
     var tint: CGColor?
     var character = CharacterAppearance() { didSet { updateLabel() } }
@@ -144,6 +155,7 @@ public final class MelyCharacterView: NSView {
         quirkIfDue(now: now)
         // Eyes on the move or a reaction playing: smooth frames.
         let travelling = abs(target.x - gaze.x) + abs(target.y - gaze.y) > 0.01 || emote?.isRunning(now) == true
+            || now - poseChangedAt < Self.poseSettle
         if travelling {
             restingSince = now
             if !isFast { schedule(fast: true) }

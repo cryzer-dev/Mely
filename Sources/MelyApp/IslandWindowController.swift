@@ -88,6 +88,7 @@ final class IslandWindowController {
         wireMachine()
         panel.onEscape = { [weak self] in
             guard let self else { return }
+            if self.escapeOverride?() == true { return }
             self.machine.collapse()
             self.panel.resignKey()
         }
@@ -127,6 +128,9 @@ final class IslandWindowController {
     }
 
     // MARK: - Wings
+
+    /// Escape goes here first; true: taken (a task field cancels its edit), the island stays.
+    var escapeOverride: (() -> Bool)?
 
     /// Something waits for the user: the wings stay out until it is answered.
     var wingsPinned: () -> Bool = { false }

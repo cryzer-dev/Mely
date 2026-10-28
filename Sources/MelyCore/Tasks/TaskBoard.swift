@@ -80,15 +80,19 @@ public struct TaskGroup: Identifiable, Equatable, Sendable {
 /// Tasks laid out for the tab. Pure: the app passes all open tasks and today's done ones.
 public struct TaskBoard: Equatable, Sendable {
     public let groups: [TaskGroup]
+    /// Done today, for the folded «Выполнено сегодня» at the bottom; latest first.
+    public let done: [TaskItem]
     /// Open tasks over the limit ("ещё N — открыть в Напоминаниях").
     public let hiddenCount: Int
 
     public static let limit = 300
 
-    public var isEmpty: Bool { groups.isEmpty }
+    public var isEmpty: Bool { groups.isEmpty && done.isEmpty }
 
+    /// - Parameter lingering: just marked done: they stay in place, crossed out, for a moment
+    ///   before moving to `done`.
     public static func make(items: [TaskItem], filter: TaskFilter, now: Date, calendar: Calendar = .current,
-                            limit: Int = limit) -> TaskBoard {
+                            lingering: Set<String> = [], limit: Int = limit) -> TaskBoard {
         let today = calendar.startOfDay(for: now)
         let soonEnd = calendar.date(byAdding: .day, value: 8, to: today) ?? today
         let tag = filter.tag?.lowercased()
@@ -103,7 +107,12 @@ public struct TaskBoard: Equatable, Sendable {
         var overdue: [TaskItem] = []
         var days: [Date: [TaskItem]] = [:]
         var undated: [TaskItem] = []
+        var done: [TaskItem] = []
         for item in shown {
+            if item.isCompleted, !lingering.contains(item.id) {
+                done.append(item)
+                continue
+            }
             guard let due = item.due else {
                 if filter.period == .all { undated.append(item) }
                 continue
@@ -131,16 +140,17 @@ public struct TaskBoard: Equatable, Sendable {
             add(.day(day), title(of: day, today: today, calendar: calendar), days[day] ?? [])
         }
         add(.undated, "Без срока", undated, load: false)
-        return capped(groups, limit: limit)
+        let board = capped(groups, limit: limit)
+        return TaskBoard(groups: board.groups, done: done.sorted { ($0.completedAt ?? now) > ($1.completedAt ?? now) },
+                         hiddenCount: board.hiddenCount)
     }
 
-    /// The compact block on the "Сегодня" tab: overdue and today, open first, at most `limit`.
-    public static func todaySummary(items: [TaskItem], now: Date, calendar: Calendar = .current,
+    /// The compact block on the "Сегодня" tab: open tasks, overdue and today, at most `limit`.
+    public static func todaySummary(items: [TaskItem], now: Date, calendar: Calendar = .current, lingering: Set<String> = [],
                                     limit: Int = 5) -> (items: [TaskItem], more: Int, load: TaskLoad?) {
-        let board = make(items: items, filter: TaskFilter(period: .today), now: now, calendar: calendar)
+        let board = make(items: items, filter: TaskFilter(period: .today), now: now, calendar: calendar, lingering: lingering)
         let all = board.groups.flatMap(\.items)
-        let ordered = all.filter { !$0.isCompleted } + all.filter(\.isCompleted)
-        return (Array(ordered.prefix(limit)), max(0, ordered.count - limit), TaskLoad(all))
+        return (Array(all.prefix(limit)), max(0, all.count - limit), TaskLoad(all))
     }
 
     /// Open tasks first: timed by time, then by priority, then by title; done ones after.
@@ -156,7 +166,8 @@ public struct TaskBoard: Equatable, Sendable {
             if ka.0 != kb.0 { return ka.0 < kb.0 }
             if ka.1 != kb.1 { return ka.1 < kb.1 }
             if ka.2 != kb.2 { return ka.2 < kb.2 }
-            return ka.3 < kb.3
+            // "Задача 2" before "Задача 13".
+            return ka.3.localizedStandardCompare(kb.3) == .orderedAscending
         }
     }
 
@@ -173,11 +184,50 @@ public struct TaskBoard: Equatable, Sendable {
             }
             if !items.isEmpty { kept.append(TaskGroup(kind: group.kind, title: group.title, items: items, load: group.load)) }
         }
-        return TaskBoard(groups: kept, hiddenCount: hidden)
+        return TaskBoard(groups: kept, done: [], hiddenCount: hidden)
     }
 
-    private static let weekdays = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"]
-    private static let months = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"]
+    static let weekdays = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"]
+    static let months = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"]
+
+    /// A chip or a row: "сегодня", "завтра", "пт", "12 ноя", with ", 15:00" for a time.
+    public static func label(_ due: TaskDue, now: Date, calendar: Calendar = .current) -> String {
+        let day = dayLabel(due.dayStart(calendar: calendar), now: now, calendar: calendar)
+        guard case let .time(date) = due else { return day }
+        return "\(day), \(time(date, calendar: calendar))"
+    }
+
+    /// The due in a row whose group already names the day: the time, or "просрочено · 24 окт".
+    public static func rowLabel(_ due: TaskDue, now: Date, calendar: Calendar = .current) -> String? {
+        if due.isOverdue(now: now, calendar: calendar) {
+            let dayStart = due.dayStart(calendar: calendar)
+            let today = calendar.startOfDay(for: now)
+            // Earlier today: just the time it was due.
+            if dayStart == today, case let .time(date) = due { return "просрочено · \(time(date, calendar: calendar))" }
+            return "просрочено · \(dayLabel(dayStart, now: now, calendar: calendar))"
+        }
+        if case let .time(date) = due { return time(date, calendar: calendar) }
+        return nil
+    }
+
+    public static func dayLabel(_ day: Date, now: Date, calendar: Calendar = .current) -> String {
+        let today = calendar.startOfDay(for: now)
+        let offset = calendar.dateComponents([.day], from: today, to: day).day ?? 0
+        switch offset {
+        case 0: return "сегодня"
+        case 1: return "завтра"
+        case -1: return "вчера"
+        case 2...6: return weekdays[calendar.component(.weekday, from: day) - 1].lowercased()
+        default:
+            let c = calendar.dateComponents([.day, .month], from: day)
+            return "\(c.day ?? 1) \(months[(c.month ?? 1) - 1])"
+        }
+    }
+
+    static func time(_ date: Date, calendar: Calendar) -> String {
+        let c = calendar.dateComponents([.hour, .minute], from: date)
+        return String(format: "%d:%02d", c.hour ?? 0, c.minute ?? 0)
+    }
 
     /// "Сегодня", "Завтра", "Чт, 30 окт".
     static func title(of day: Date, today: Date, calendar: Calendar) -> String {

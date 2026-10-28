@@ -10,7 +10,7 @@ public enum UsageCounter: Hashable, Sendable {
     case meetingJoined
 
     public enum Tab: String, CaseIterable, Sendable {
-        case sessions, chat, today, music, notifications
+        case sessions, chat, today, tasks, music, notifications
     }
 
     /// The key in the saved counts.

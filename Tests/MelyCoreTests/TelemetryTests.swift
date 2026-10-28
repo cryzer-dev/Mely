@@ -41,8 +41,8 @@ import Foundation
         for signal in signals {
             #expect(Set(signal.parameters.keys).isSubset(of: ["day", "integrations", "tab"]))
         }
-        #expect(UsageCounter.allKeys == ["islandOpened", "meetingJoined", "tab.sessions", "tab.chat", "tab.today", "tab.music",
-                                         "tab.notifications"])
+        #expect(UsageCounter.allKeys == ["islandOpened", "meetingJoined", "tab.sessions", "tab.chat", "tab.today", "tab.tasks",
+                                         "tab.music", "tab.notifications"])
     }
 
     @Test func unknownSavedKeysAreDropped() throws {

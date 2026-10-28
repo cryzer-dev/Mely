@@ -237,16 +237,33 @@ private struct CardButton: View {
 @MainActor
 @Observable
 public final class IslandTabs {
-    public enum Tab: Hashable, Sendable { case sessions, chat, notifications, today, music }
+    public enum Tab: Hashable, Sendable { case sessions, chat, notifications, today, tasks, music }
     public var selected: Tab = .sessions
     /// Bumped to put the cursor in the chat field.
     public var chatFocus = 0
+    /// The task open in the "Задачи" tab (a click on the "Сегодня" tab opens it there).
+    public var openTask: String?
+    /// Set by a field that takes Escape itself (a task being edited): the island stays open.
+    @ObservationIgnored public var escape: (() -> Void)?
+
+    /// Escape in the island: true when a field took it, false to fold the island.
+    public func handleEscape() -> Bool {
+        guard let escape else { return false }
+        escape()
+        return true
+    }
 
     public init() {}
 
     public func showChat() {
         selected = .chat
         chatFocus += 1
+    }
+
+    /// The "Задачи" tab, with this task open.
+    public func showTask(_ id: String?) {
+        openTask = id
+        selected = .tasks
     }
 }
 
@@ -262,6 +279,8 @@ public struct ClaudeOverview: View {
     let notifications: AnyView?
     /// The calendar's "Сегодня" tab.
     let today: AnyView?
+    /// The "Задачи" tab.
+    let tasks: AnyView?
     /// The mini-player, while something plays (and 5 minutes after).
     let music: AnyView?
     let open: (ClaudeSession) -> Void
@@ -272,7 +291,7 @@ public struct ClaudeOverview: View {
 
     public init(store: SessionStore, queue: ApprovalQueue, usage: PlanUsageStore? = nil,
                 tabs: IslandTabs? = nil, chat: AnyView? = nil, notifications: AnyView? = nil,
-                today: AnyView? = nil, music: AnyView? = nil,
+                today: AnyView? = nil, tasks: AnyView? = nil, music: AnyView? = nil,
                 open: @escaping (ClaudeSession) -> Void,
                 decide: @escaping (PendingRequest, HookDecision) -> Void,
                 answerInTerminal: @escaping (PendingRequest) -> Void) {
@@ -283,6 +302,7 @@ public struct ClaudeOverview: View {
         self.chat = chat
         self.notifications = notifications
         self.today = today
+        self.tasks = tasks
         self.music = music
         self.open = open
         self.decide = decide
@@ -305,6 +325,8 @@ public struct ClaudeOverview: View {
                         notifications
                     } else if tabs.selected == .today, let today {
                         today
+                    } else if tabs.selected == .tasks, let tasks {
+                        tasks
                     } else if tabs.selected == .music, let music {
                         music
                     } else {
@@ -330,11 +352,13 @@ public struct ClaudeOverview: View {
         .preference(key: IslandContentHeightKey.self, value: pageHeight)
     }
 
-    /// The chat and a request get `IslandPresentation.fullPage`; the other pages what they
+    /// The chat, the tasks and a request get `IslandPresentation.fullPage`; the other pages what they
     /// measured (the sessions: room for three or four, `SessionsOverview.listHeight`).
     private var pageHeight: CGFloat? {
         guard queue.current == nil, let tabs else { return IslandPresentation.fullPage }
         if tabs.selected == .chat, chat != nil { return IslandPresentation.fullPage }
+        // Room for the list and the «+ Задача» line under it.
+        if tabs.selected == .tasks, tasks != nil { return IslandPresentation.fullPage }
         return heights[tabs.selected]
     }
 }

@@ -68,17 +68,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             },
             compactTrailing: AnyView(CompactSessionStatus(store: store, usage: sessions.usage, music: nowPlaying.model)),
-            expanded: { [chat, notifications, calendar, nowPlaying, tabs, updateState, inbox, inboxSettings, telemetry] in
+            expanded: { [chat, notifications, calendar, reminders, nowPlaying, tabs, updateState, inbox, inboxSettings, telemetry] in
                 WithCharacter(settings: character, desktop: desktop) { ExpandedIsland(sessions: sessions, chat: chat, notifications: notifications, calendar: calendar,
-                               nowPlaying: nowPlaying, tabs: tabs, updates: updateState,
+                               reminders: reminders, nowPlaying: nowPlaying, tabs: tabs, updates: updateState,
                                inbox: inbox, inboxSettings: inboxSettings, count: { telemetry.count($0) },
                                enableCalendar: { [weak self] in
                                    guard let self else { return }
                                    Task { await self.registry.setEnabled("calendar", true) }
                                }) }
             },
-            header: { [chat, notifications, calendar, nowPlaying, tabs, behavior, updateState, inbox, inboxSettings] in
-                ExpandedHeader(sessions: sessions, chat: chat, notifications: notifications, calendar: calendar, nowPlaying: nowPlaying,
+            header: { [chat, notifications, calendar, reminders, nowPlaying, tabs, behavior, updateState, inbox, inboxSettings] in
+                ExpandedHeader(sessions: sessions, chat: chat, notifications: notifications, calendar: calendar, reminders: reminders,
+                               nowPlaying: nowPlaying,
                                tabs: tabs, behavior: behavior, updates: updateState,
                                inbox: inbox, inboxSettings: inboxSettings,
                                openSettings: { [weak self] in self?.openSettings() },
@@ -91,15 +92,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return IslandWings.live(states: sessions.store.sessions.map(\.state), usage: sessions.usage.usage)
                 || self?.nowPlaying.model.current?.isPlaying == true
         }
-        // Approvals and questions hold the island; so does typing in the chat, and
-        // carrying Mely out of it.
+        // Approvals and questions hold the island; so does typing in the chat or the tasks,
+        // and carrying Mely out of it.
         let presence = desktopPresence
         island?.machine.isHeldOpen = { [weak model, weak self] in
             (model?.holdsIslandOpen ?? false)
-                || (self?.tabs.selected == .chat && self?.island?.hasKeyboard == true)
+                || ([.chat, .tasks].contains(self?.tabs.selected) && self?.island?.hasKeyboard == true)
                 || presence.isDragging
         }
         island?.isCarrying = { presence.isDragging }
+        island?.escapeOverride = { [weak self] in self?.tabs.handleEscape() ?? false }
         desktop.islandFrame = { [weak self] in self?.island?.screenFrame ?? .zero }
         desktop.alertActive = { [weak sessions] in !(sessions?.queue.requests.isEmpty ?? true) }
         desktop.busy = { [weak sessions] in
@@ -363,6 +365,7 @@ private struct ExpandedIsland: View {
     let chat: ClaudeChatIntegration
     let notifications: NotificationMirrorIntegration
     let calendar: CalendarIntegration
+    let reminders: RemindersIntegration
     let nowPlaying: NowPlayingIntegration
     let tabs: IslandTabs
     let updates: UpdateState
@@ -377,7 +380,8 @@ private struct ExpandedIsland: View {
         // Mely big on the left; in the chat it reacts to the answer. A waiting version: «Обновить» under it.
         HStack(alignment: .top, spacing: 12) {
             LivePose(sessions: sessions, nowPlaying: nowPlaying) { pose in
-                ChatAwarePose(conversation: tabs.selected == .chat ? chat.conversation : nil, fallback: pose)
+                ChatAwarePose(conversation: tabs.selected == .chat ? chat.conversation : nil,
+                              fallback: reminders.celebrating ? TaskCelebration.pose(pose) : pose)
             }
             .updatePill(updates.pendingVersion, action: updates.installNow)
             .frame(width: 88)
@@ -397,6 +401,7 @@ private struct ExpandedIsland: View {
         case .sessions: .sessions
         case .chat: .chat
         case .today: .today
+        case .tasks: .tasks
         case .music: .music
         case .notifications: .notifications
         }
@@ -426,6 +431,7 @@ private struct ExpandedIsland: View {
                                                  enable: enableCalendar) { event in
                            if let link = event.meeting { calendar.join(link) }
                        }),
+                       tasks: reminders.status == .running ? AnyView(tasksPage) : nil,
                        music: nowPlaying.status == .running && nowPlaying.model.isVisible()
                            ? AnyView(MiniPlayerView(model: nowPlaying.model, peeks: nowPlaying.peeks, send: { nowPlaying.send($0) },
                                                     seek: { nowPlaying.seek(to: $0) },
@@ -437,6 +443,27 @@ private struct ExpandedIsland: View {
     }
 }
 
+extension ExpandedIsland {
+    var tasksPage: some View {
+        var actions = TasksActions()
+        let reminders = reminders
+        actions.setCompleted = { reminders.setCompleted($0, $1) }
+        actions.create = { reminders.create($0) }
+        actions.rename = { reminders.rename($0, to: $1) }
+        actions.setDue = { reminders.setDue($0, $1) }
+        actions.moveToDay = { reminders.move($0, toDayOf: $1) }
+        actions.setPriority = { reminders.setPriority($0, $1) }
+        actions.setMarks = { reminders.setMarks($0, $1) }
+        actions.moveToList = { reminders.move($0, toList: $1) }
+        actions.moveOverdueToToday = { reminders.moveOverdueToToday($0) }
+        actions.open = { reminders.open($0) }
+        actions.delete = { reminders.delete($0) }
+        actions.undoDelete = { reminders.undoDelete($0) }
+        return TasksView(items: reminders.items, lists: reminders.lists, hasLoaded: reminders.hasLoaded,
+                         settings: reminders.settings, tabs: tabs, actions: actions)
+    }
+}
+
 /// The expanded island's top row (task 7.9): the sections that exist right now, the plan,
 /// sound, settings and «×».
 private struct ExpandedHeader: View {
@@ -444,6 +471,7 @@ private struct ExpandedHeader: View {
     let chat: ClaudeChatIntegration
     let notifications: NotificationMirrorIntegration
     let calendar: CalendarIntegration
+    let reminders: RemindersIntegration
     let nowPlaying: NowPlayingIntegration
     let tabs: IslandTabs
     let behavior: IslandBehavior
@@ -457,6 +485,7 @@ private struct ExpandedHeader: View {
         var items = [IslandHeader.Item(.sessions, icon: "house.fill", title: "Claude Code")]
         if chat.conversation != nil { items.append(.init(.chat, icon: "bubble.left.fill", title: "Чат")) }
         items.append(.init(.today, icon: "calendar", title: "Сегодня"))
+        if reminders.status == .running { items.append(.init(.tasks, icon: "checklist", title: "Задачи")) }
         if nowPlaying.status == .running && nowPlaying.model.isVisible() {
             items.append(.init(.music, icon: "music.note", title: "Музыка"))
         }
@@ -525,6 +554,16 @@ private struct LivePose<Content: View>: View {
         // Re-read every minute: falling asleep depends on time alone.
         TimelineView(.periodic(from: .now, by: 60)) { context in
             content(CharacterMood.pose(inputs, now: context.date))
+        }
+    }
+}
+
+/// A task just done: Mely is glad for a moment, unless something matters more.
+enum TaskCelebration {
+    static func pose(_ pose: CharacterPose) -> CharacterPose {
+        switch pose {
+        case .worried, .curious, .scared, .sad: pose
+        default: .happy
         }
     }
 }

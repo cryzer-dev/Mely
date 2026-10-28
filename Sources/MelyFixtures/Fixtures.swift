@@ -56,6 +56,7 @@ public enum Fixtures {
             .init(.sessions, icon: "house.fill", title: "Claude Code"),
             .init(.chat, icon: "bubble.left.fill", title: "Чат"),
             .init(.today, icon: "calendar", title: "Сегодня"),
+            .init(.tasks, icon: "checklist", title: "Задачи"),
             .init(.music, icon: "music.note", title: "Музыка"),
             .init(.notifications, icon: "bell.fill", title: "Уведомления", badge: 3),
         ], usage: usage ?? self.usage(.header), soundOn: true, heldOpen: held, updateAvailable: updateAvailable,
@@ -271,6 +272,83 @@ public enum Fixtures {
                                             start: now.addingTimeInterval(20 * 60 + 20), end: now.addingTimeInterval(65 * 60),
                                             isAllDay: false, meeting: jitsi)],
                       tomorrow: [])
+    }
+
+    // MARK: Tasks
+
+    public enum TaskSample: String, CaseIterable, Sendable {
+        /// Overdue, timed and untimed today, one done.
+        case ordinary
+        /// Long titles, many tags, every group.
+        case long
+        /// Forty tasks over every group and list, most without an estimate; several done.
+        case crowded
+        case empty
+    }
+
+    public static let taskLists = [TaskList(id: "work", title: "Работа"), TaskList(id: "home", title: "Дом"),
+                                   TaskList(id: "long", title: "Очень длинное название списка напоминаний семьи")]
+
+    public static func tasks(_ sample: TaskSample, now: Date = Date()) -> [TaskItem] {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: now)
+        func day(_ d: Int) -> TaskDue { .day(of: cal.date(byAdding: .day, value: d, to: today)!, calendar: cal) }
+        func at(_ h: Int, _ m: Int = 0, day d: Int = 0) -> TaskDue {
+            .time(cal.date(bySettingHour: h, minute: m, second: 0, of: cal.date(byAdding: .day, value: d, to: today)!)!)
+        }
+        func task(_ id: String, _ title: String, _ due: TaskDue?, _ p: TaskPriority = .none, tags: [String] = [],
+                  estimate: TaskEstimate? = nil, list: String = "work", done: Bool = false) -> TaskItem {
+            TaskItem(id: id, title: title, due: due, priority: p, marks: TaskMarks(tags: tags, estimate: estimate), listId: list,
+                     listTitle: taskLists.first { $0.id == list }!.title, completedAt: done ? now.addingTimeInterval(-1800) : nil)
+        }
+        switch sample {
+        case .empty:
+            return []
+        case .ordinary:
+            return [
+                task("t1", "Оплатить интернет", day(-2), list: "home"),
+                task("t2", "Созвон с бухгалтером", at(15), .high, tags: ["финансы"], estimate: .m30),
+                task("t3", "Отчёт по релизу", day(0), .medium, tags: ["работа"], estimate: .m45),
+                task("t4", "Купить корм", day(0), list: "home"),
+                task("t5", "Ответить на ревью", day(0), tags: ["работа"], estimate: .m15, done: true),
+                task("t6", "Записаться к стоматологу", day(1), list: "home"),
+                task("t7", "Переезд на новый сервер", day(3), tags: ["работа"], estimate: .overHour),
+                task("t8", "Прочитать статью про EventKit", nil, .low),
+            ]
+        case .crowded:
+            let lists = ["work", "home", "long"]
+            return (0..<40).map { i in
+                task("c\(i)", "Дело номер \(i + 1)", i % 5 == 0 ? day(-(i % 3) - 1) : i % 5 == 4 ? nil : i % 2 == 0 ? at(8 + i % 12, 15, day: i % 8) : day(i % 8),
+                     TaskPriority(rawValue: i % 4)!, tags: i % 3 == 0 ? ["дом"] : [],
+                     estimate: i % 4 == 0 ? .overHour : i % 7 == 0 ? .m45 : nil, list: lists[i % 3], done: i % 9 == 0)
+            }
+        case .long:
+            let long = " — очень длинное название задачи, которое точно не помещается в одну строку челки"
+            return (0..<14).map { i in
+                task("l\(i)", "Задача \(i + 1)" + long, i % 4 == 0 ? day(-1) : i % 4 == 1 ? at(9 + i, 30) : i % 4 == 2 ? day(i) : nil,
+                     TaskPriority(rawValue: i % 4)!, tags: ["работа", "релиз", "очень-длинный-тег-\(i)"],
+                     estimate: TaskEstimate.allCases[i % 5], list: i % 2 == 0 ? "work" : "long", done: i % 5 == 0)
+            }
+        }
+    }
+
+    /// The "Задачи" tab with a filter, an open task or something typed in «+ Задача».
+    public static func tasksPage(_ items: [TaskItem], period: TaskFilter.Period = .today, listId: String? = nil, tag: String? = nil,
+                                 openTask: String? = nil, typed: String? = nil, chosenList: String? = nil,
+                                 hasLoaded: Bool = true, showsDone: Bool = false, deleted: String? = nil) -> some View {
+        let tabs = IslandTabs()
+        tabs.selected = .tasks
+        tabs.openTask = openTask
+        let settings = TaskSettings(defaults: UserDefaults(suiteName: "dev.mely.fixtures.tasks") ?? .standard)
+        settings.filter = TaskFilter(period: period, listId: listId, tag: tag)
+        var draft = QuickTaskDraft()
+        if let typed { draft.setText(typed) }
+        if let chosenList { draft.setList(chosenList) }
+        return ClaudeOverview(store: SessionStore(), queue: ApprovalQueue(), tabs: tabs,
+                              tasks: AnyView(TasksView(items: items, lists: taskLists, hasLoaded: hasLoaded, settings: settings,
+                                                       tabs: tabs, draft: draft, showsDone: showsDone, deleted: deleted,
+                                                       actions: TasksActions())),
+                              open: { _ in }, decide: { _, _ in }, answerInTerminal: { _ in })
     }
 
     public static func agendaPage(_ agenda: Agenda?, isOn: Bool = true) -> some View {

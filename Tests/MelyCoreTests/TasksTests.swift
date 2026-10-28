@@ -166,11 +166,20 @@ import Foundation
         #expect(board.isEmpty)
     }
 
-    @Test func doneTodayStaysAtTheEnd() {
+    @Test func doneGoesToItsOwnSection() {
         let items = [task("Сделано", day(0), .high, done: at(9)), task("Осталось", day(0)),
-                     task("Вчерашнее", day(-1), done: at(18, plusDays: -1))]
+                     task("Только что", day(0), done: at(9.9)), task("Вчерашнее", day(-1), done: at(18, plusDays: -1)),
+                     task("Без даты, сделано", nil, done: at(8))]
         let board = TaskBoard.make(items: items, filter: TaskFilter(), now: at(10), calendar: cal)
-        #expect(titles(board) == [["Осталось", "Сделано"]])
+        #expect(titles(board) == [["Осталось"]])
+        // Latest first, whatever the due; yesterday's are gone.
+        #expect(board.done.map(\.title) == ["Только что", "Сделано", "Без даты, сделано"])
+        // Just marked: still in place, crossed out, at the end of its group.
+        let lingering = TaskBoard.make(items: items, filter: TaskFilter(), now: at(10), calendar: cal, lingering: ["Только что"])
+        #expect(titles(lingering) == [["Осталось", "Только что"]])
+        #expect(lingering.done.map(\.title) == ["Сделано", "Без даты, сделано"])
+        // Only done ones: not "Задач нет".
+        #expect(!TaskBoard.make(items: [items[0]], filter: TaskFilter(), now: at(10), calendar: cal).isEmpty)
     }
 
     @Test func daySum() {
@@ -196,6 +205,19 @@ import Foundation
         let morning = TaskBoard.make(items: items, filter: TaskFilter(), now: at(8, plusDays: 1), calendar: cal)
         #expect(morning.groups.map(\.title) == ["Просрочено", "Сегодня"])
         #expect(titles(morning) == [["Сегодня"], ["Завтра"]])
+    }
+
+    @Test func dueLabels() {
+        let now = at(12)
+        #expect(TaskBoard.label(day(0), now: now, calendar: cal) == "сегодня")
+        #expect(TaskBoard.label(.time(at(10, plusDays: 1)), now: now, calendar: cal) == "завтра, 10:00")
+        #expect(TaskBoard.label(day(3), now: now, calendar: cal) == "пт")
+        #expect(TaskBoard.label(day(16), now: now, calendar: cal) == "12 ноя")
+        #expect(TaskBoard.rowLabel(.time(at(15)), now: now, calendar: cal) == "15:00")
+        #expect(TaskBoard.rowLabel(day(0), now: now, calendar: cal) == nil)
+        #expect(TaskBoard.rowLabel(.time(at(9.5)), now: now, calendar: cal) == "просрочено · 9:30")
+        #expect(TaskBoard.rowLabel(day(-1), now: now, calendar: cal) == "просрочено · вчера")
+        #expect(TaskBoard.rowLabel(day(-3), now: now, calendar: cal) == "просрочено · 24 окт")
     }
 
     @Test func todaySummaryShowsMore() {

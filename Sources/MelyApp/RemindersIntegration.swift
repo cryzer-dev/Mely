@@ -23,6 +23,9 @@ final class RemindersIntegration: Integration {
     private(set) var lists: [TaskList] = []
     /// False until the first load: "loading", not "no tasks".
     private(set) var hasLoaded = false
+    /// A task was just marked done: Mely is glad for a moment.
+    private(set) var celebrating = false
+    @ObservationIgnored private var celebration: Task<Void, Never>?
 
     @ObservationIgnored let settings = TaskSettings()
     /// Its own store: switched off, the integration holds nothing (the calendar has its own).
@@ -173,6 +176,17 @@ final class RemindersIntegration: Integration {
 
     func setCompleted(_ id: String, _ done: Bool) {
         change(id) { $0.isCompleted = done }
+        if done { celebrate() }
+    }
+
+    private func celebrate() {
+        celebrating = true
+        celebration?.cancel()
+        celebration = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(1.5))
+            guard !Task.isCancelled else { return }
+            self?.celebrating = false
+        }
     }
 
     func rename(_ id: String, to title: String) {

@@ -23,7 +23,7 @@ public struct LayoutVariant {
 public enum LayoutMatrix {
     public static var all: [LayoutVariant] {
         Fixtures.screens.flatMap { screen -> [LayoutVariant] in
-            let groups: [[LayoutVariant]] = [header(screen), sessions(screen), chat(screen), today(screen), messages(screen),
+            let groups: [[LayoutVariant]] = [header(screen), sessions(screen), chat(screen), today(screen), tasks(screen), messages(screen),
                                              music(screen), requests(screen), compact(screen), peeks(screen)]
             return groups.flatMap { $0 }
         }
@@ -153,6 +153,46 @@ public enum LayoutMatrix {
             expanded("Today_Overflow", screen, .today) { Fixtures.agendaPage(Fixtures.agenda(12, long: true)) },
             // A long name next to both the countdown and «Подключиться».
             expanded("Today_SoonLong", screen, .today) { Fixtures.agendaPage(Fixtures.soonMeeting()) },
+        ]
+    }
+
+    static func tasks(_ screen: Fixtures.Screen) -> [LayoutVariant] {
+        [
+            expanded("Tasks_Today", screen, .tasks) { Fixtures.tasksPage(Fixtures.tasks(.ordinary)) },
+            expanded("Tasks_Soon", screen, .tasks) { Fixtures.tasksPage(Fixtures.tasks(.ordinary), period: .soon) },
+            expanded("Tasks_All", screen, .tasks) { Fixtures.tasksPage(Fixtures.tasks(.ordinary), period: .all) },
+            expanded("Tasks_Empty", screen, .tasks) { Fixtures.tasksPage(Fixtures.tasks(.empty)) },
+            expanded("Tasks_DoneOpen", screen, .tasks) { Fixtures.tasksPage(Fixtures.tasks(.ordinary), showsDone: true) },
+            expanded("Tasks_AllDone", screen, .tasks) {
+                Fixtures.tasksPage(Fixtures.tasks(.ordinary).filter(\.isCompleted))
+            },
+            expanded("Tasks_Loading", screen, .tasks) { Fixtures.tasksPage([], hasLoaded: false) },
+            expanded("Tasks_Long", screen, .tasks) { Fixtures.tasksPage(Fixtures.tasks(.long), period: .all) },
+            expanded("Tasks_Editor", screen, .tasks) { Fixtures.tasksPage(Fixtures.tasks(.ordinary), openTask: "t2") },
+            expanded("Tasks_EditorLong", screen, .tasks) {
+                Fixtures.tasksPage(Fixtures.tasks(.long), period: .all, openTask: "l1")
+            },
+            // Overflow: long list and tag in the filters, a crowded week, every chip with long text.
+            expanded("Tasks_LongFilters", screen, .tasks) {
+                Fixtures.tasksPage(Fixtures.tasks(.long), period: .all, listId: "long", tag: "очень-длинный-тег-1")
+            },
+            expanded("Tasks_Crowded", screen, .tasks) { Fixtures.tasksPage(Fixtures.tasks(.crowded), period: .soon) },
+            expanded("Tasks_CrowdedAll", screen, .tasks) { Fixtures.tasksPage(Fixtures.tasks(.crowded), period: .all) },
+            expanded("Tasks_LongDoneOpen", screen, .tasks) {
+                Fixtures.tasksPage(Fixtures.tasks(.long), period: .all, showsDone: true)
+            },
+            expanded("Tasks_Deleted", screen, .tasks) {
+                Fixtures.tasksPage(Fixtures.tasks(.ordinary),
+                                   deleted: "Очень длинное название удалённой задачи, которое не помещается в строку")
+            },
+            expanded("Tasks_AddLong", screen, .tasks) {
+                Fixtures.tasksPage(Fixtures.tasks(.long),
+                                   typed: "подготовить квартальный отчёт для совета директоров 12 ноября в 18:30 !!! #работа #очень-длинный-тег-3 #релиз ~3ч",
+                                   chosenList: "long")
+            },
+            expanded("Tasks_Add", screen, .tasks) {
+                Fixtures.tasksPage(Fixtures.tasks(.ordinary), typed: "отчёт по релизу в пт !! #работа ~45м")
+            },
         ]
     }
 
