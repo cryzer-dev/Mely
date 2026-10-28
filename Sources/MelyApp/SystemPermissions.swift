@@ -51,6 +51,8 @@ final class SystemPermissions: PermissionChecking {
             return true
         case .calendars:
             return EKEventStore.authorizationStatus(for: .event) == .fullAccess
+        case .reminders:
+            return EKEventStore.authorizationStatus(for: .reminder) == .fullAccess
         case .microphone:
             return AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
         case .speechRecognition:
@@ -73,6 +75,12 @@ final class SystemPermissions: PermissionChecking {
             // prompt, the switch is in System Settings, where Mely is already listed.
             if EKEventStore.authorizationStatus(for: .event) != .fullAccess {
                 SystemSettingsLinks.open(.calendars)
+            }
+        case .reminders:
+            _ = try? await EKEventStore().requestFullAccessToReminders()
+            // Same as calendars: after a "no" macOS never asks again.
+            if EKEventStore.authorizationStatus(for: .reminder) != .fullAccess {
+                SystemSettingsLinks.open(.reminders)
             }
         case .microphone:
             _ = await AVCaptureDevice.requestAccess(for: .audio)

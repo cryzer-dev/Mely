@@ -28,6 +28,8 @@
 	<string>Mely читает текущую вкладку браузера и переключает приложения по вашей команде.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>Mely показывает события на сегодня и сообщает о новых встречах.</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>Mely показывает задачи на сегодня, отмечает выполненные и добавляет новые по вашей команде.</string>
 	<key>NSDesktopFolderUsageDescription</key>
 	<string>Mely забирает скриншоты с рабочего стола на бельевую верёвку, если вы это включили.</string>
 	<key>NSDownloadsFolderUsageDescription</key>

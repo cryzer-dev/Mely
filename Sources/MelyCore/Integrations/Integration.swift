@@ -4,6 +4,7 @@ import Foundation
 public enum SystemPermission: Hashable, Sendable {
     case fullDiskAccess
     case calendars
+    case reminders
     case microphone
     case speechRecognition
     case automation(bundleId: String)
@@ -14,6 +15,7 @@ public enum SystemPermission: Hashable, Sendable {
         switch self {
         case .fullDiskAccess: "Доступ к диску"
         case .calendars: "Календари"
+        case .reminders: "Напоминания"
         case .microphone: "Микрофон"
         case .speechRecognition: "Распознавание речи"
         case .automation: "Автоматизация"

@@ -15,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let chat = ClaudeChatIntegration()
     private let notifications = NotificationMirrorIntegration()
     private let calendar = CalendarIntegration()
+    private let reminders = RemindersIntegration()
     private let nowPlaying = NowPlayingIntegration()
     private let tabs = IslandTabs()
     private let inboxSettings = InboxSettings()
@@ -137,6 +138,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         calendar.inboxSettings = inboxSettings
         registry.register(notifications)
         registry.register(calendar)
+        registry.register(reminders)
         registry.register(nowPlaying)
         nowPlaying.peek = { [weak self] in self?.island?.showPeek($0, for: .seconds(4)) }
         calendar.peek = { [weak self] content in

@@ -196,6 +196,7 @@ enum SystemSettingsLinks {
         let anchor: String = switch permission {
         case .fullDiskAccess: "Privacy_AllFiles"
         case .calendars: "Privacy_Calendars"
+        case .reminders: "Privacy_Reminders"
         case .microphone: "Privacy_Microphone"
         case .speechRecognition: "Privacy_SpeechRecognition"
         case .automation: "Privacy_Automation"
