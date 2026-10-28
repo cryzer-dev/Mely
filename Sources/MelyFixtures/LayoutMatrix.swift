@@ -245,6 +245,8 @@ public enum LayoutMatrix {
 
     static func requests(_ screen: Fixtures.Screen) -> [LayoutVariant] {
         [
+            expanded("WhatsNew", screen, .sessions) { Fixtures.whatsNewPage() },
+            expanded("WhatsNew_NoNotes", screen, .sessions) { Fixtures.whatsNewPage(withNotes: false) },
             expanded("Request_Approval", screen, .sessions, held: true) { Fixtures.requestPage(question: false) },
             expanded("Request_Question", screen, .sessions, held: true) { Fixtures.requestPage(question: true) },
             // Scrolled to the end: the own answer is whole, not lost in the fade.

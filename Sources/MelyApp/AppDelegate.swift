@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let reminders = RemindersIntegration()
     private let nowPlaying = NowPlayingIntegration()
     private let tabs = IslandTabs()
+    private let whatsNew = WhatsNewState()
     private let inboxSettings = InboxSettings()
     private let telemetry = Telemetry()
     private lazy var inbox = NotificationInbox(fileURL: inboxSettings.persists ? NotificationInbox.defaultURL : nil)
@@ -68,9 +69,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             },
             compactTrailing: AnyView(CompactSessionStatus(store: store, usage: sessions.usage, music: nowPlaying.model)),
-            expanded: { [chat, notifications, calendar, reminders, nowPlaying, tabs, updateState, inbox, inboxSettings, telemetry] in
+            expanded: { [chat, notifications, calendar, reminders, nowPlaying, tabs, updateState, inbox, inboxSettings, telemetry, whatsNew] in
                 WithCharacter(settings: character, desktop: desktop) { ExpandedIsland(sessions: sessions, chat: chat, notifications: notifications, calendar: calendar,
-                               reminders: reminders, nowPlaying: nowPlaying, tabs: tabs, updates: updateState,
+                               reminders: reminders, nowPlaying: nowPlaying, whatsNew: whatsNew,
+                               tryTasks: { [weak self] in self?.tryTasks() }, tabs: tabs, updates: updateState,
                                inbox: inbox, inboxSettings: inboxSettings, count: { telemetry.count($0) },
                                enableCalendar: { [weak self] in
                                    guard let self else { return }
@@ -101,7 +103,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 || presence.isDragging
         }
         island?.isCarrying = { presence.isDragging }
-        island?.escapeOverride = { [weak self] in self?.tabs.handleEscape() ?? false }
+        island?.escapeOverride = { [weak self] in
+            guard let self else { return false }
+            // Esc closes «Что нового» first; the island stays open.
+            if self.whatsNew.isShowing {
+                self.whatsNew.dismiss()
+                return true
+            }
+            return self.tabs.handleEscape()
+        }
         desktop.islandFrame = { [weak self] in self?.island?.screenFrame ?? .zero }
         desktop.alertActive = { [weak sessions] in !(sessions?.queue.requests.isEmpty ?? true) }
         desktop.busy = { [weak sessions] in
@@ -164,7 +174,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.openSettings(on: .general)
             } else if id.hasPrefix(Self.updatedPeekPrefix) {
                 let version = String(id.dropFirst(Self.updatedPeekPrefix.count))
-                if let url = self.updateState.notesURL(for: version) { NSWorkspace.shared.open(url) }
+                // A release with a card shows it in the island; others open their page.
+                if self.whatsNew.card.matches(version) {
+                    self.whatsNew.show()
+                    self.island?.expandForAlert()
+                } else if let url = self.updateState.notesURL(for: version) {
+                    NSWorkspace.shared.open(url)
+                }
             } else if id.hasPrefix(RemindersIntegration.duePrefix) {
                 self.reminders.runPeekAction(id)
             } else {
@@ -191,6 +207,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     static let updatePeekPrefix = "update-available-"
     static let updatedPeekPrefix = "updated-"
+
+    /// «Попробовать задачи»: on (macOS asks for Reminders once), then the tab.
+    private func tryTasks() {
+        whatsNew.dismiss()
+        Task { [weak self] in
+            guard let self else { return }
+            if !self.registry.isEnabled(self.reminders.id) { await self.registry.setEnabled(self.reminders.id, true) }
+            if self.reminders.status == .running { self.tabs.showTask(nil) } else { self.openSettings(on: .integrations) }
+        }
+    }
 
     /// Daily checks for a new version (Sparkle); after an update, «Обновилась до …» with «Что нового».
     private func startUpdates() {
@@ -375,6 +401,9 @@ private struct ExpandedIsland: View {
     let calendar: CalendarIntegration
     let reminders: RemindersIntegration
     let nowPlaying: NowPlayingIntegration
+    let whatsNew: WhatsNewState
+    /// «Попробовать задачи» on «Что нового».
+    let tryTasks: () -> Void
     let tabs: IslandTabs
     let updates: UpdateState
     let inbox: NotificationInbox
@@ -398,6 +427,7 @@ private struct ExpandedIsland: View {
         }
         // Shown afresh on each opening of the island.
         .onAppear {
+            whatsNew.showIfNew(appVersion: AppInfo.version)
             count(.islandOpened)
             count(.tabOpened(Self.usageTab(tabs.selected)))
         }
@@ -445,6 +475,9 @@ private struct ExpandedIsland: View {
                                                     seek: { nowPlaying.seek(to: $0) },
                                                     openSource: { nowPlaying.openSource($0) }))
                            : nil,
+                       whatsNew: whatsNew.isShowing ? AnyView(WhatsNewView(card: whatsNew.card, tryTasks: tryTasks,
+                                                                           done: { [whatsNew] in whatsNew.dismiss() },
+                                                                           more: whatsNewNotes)) : nil,
                        open: { HostActivator.activate($0.host, origin: $0.origin) },
                        decide: { [weak sessions] in sessions?.decide($0, $1) },
                        answerInTerminal: { [weak sessions] in sessions?.answerInTerminal($0) })
@@ -452,6 +485,12 @@ private struct ExpandedIsland: View {
 }
 
 extension ExpandedIsland {
+    /// «Подробнее ↗»: this release's page, when the version has one.
+    var whatsNewNotes: (() -> Void)? {
+        guard let url = updates.notesURL(for: AppInfo.version) else { return nil }
+        return { NSWorkspace.shared.open(url) }
+    }
+
     /// Today's tasks under the events, while the tasks are on and shown there.
     var todayTasks: TodayTasks? {
         guard reminders.status == .running, reminders.settings.showsInToday else { return nil }

@@ -294,6 +294,8 @@ public struct ClaudeOverview: View {
     let tasks: AnyView?
     /// The mini-player, while something plays (and 5 minutes after).
     let music: AnyView?
+    /// «Что нового», once after an update: over any page, under a waiting request.
+    let whatsNew: AnyView?
     let open: (ClaudeSession) -> Void
     let decide: (PendingRequest, HookDecision) -> Void
     let answerInTerminal: (PendingRequest) -> Void
@@ -302,7 +304,7 @@ public struct ClaudeOverview: View {
 
     public init(store: SessionStore, queue: ApprovalQueue, usage: PlanUsageStore? = nil,
                 tabs: IslandTabs? = nil, chat: AnyView? = nil, notifications: AnyView? = nil,
-                today: AnyView? = nil, tasks: AnyView? = nil, music: AnyView? = nil,
+                today: AnyView? = nil, tasks: AnyView? = nil, music: AnyView? = nil, whatsNew: AnyView? = nil,
                 open: @escaping (ClaudeSession) -> Void,
                 decide: @escaping (PendingRequest, HookDecision) -> Void,
                 answerInTerminal: @escaping (PendingRequest) -> Void) {
@@ -315,6 +317,7 @@ public struct ClaudeOverview: View {
         self.today = today
         self.tasks = tasks
         self.music = music
+        self.whatsNew = whatsNew
         self.open = open
         self.decide = decide
         self.answerInTerminal = answerInTerminal
@@ -325,6 +328,9 @@ public struct ClaudeOverview: View {
             if let request = queue.current {
                 RequestCard(request: request, position: 1, total: queue.requests.count,
                             decide: { decide(request, $0) }, answerInTerminal: { answerInTerminal(request) })
+                    .transition(.opacity)
+            } else if let whatsNew {
+                whatsNew
                     .transition(.opacity)
             } else if let tabs {
                 let tab = tabs.selected
@@ -366,7 +372,7 @@ public struct ClaudeOverview: View {
     /// The chat, the tasks and a request get `IslandPresentation.fullPage`; the other pages what they
     /// measured (the sessions: room for three or four, `SessionsOverview.listHeight`).
     private var pageHeight: CGFloat? {
-        guard queue.current == nil, let tabs else { return IslandPresentation.fullPage }
+        guard queue.current == nil, whatsNew == nil, let tabs else { return IslandPresentation.fullPage }
         if tabs.selected == .chat, chat != nil { return IslandPresentation.fullPage }
         // Room for the list and the «+ Задача» line under it.
         if tabs.selected == .tasks, tasks != nil { return IslandPresentation.fullPage }

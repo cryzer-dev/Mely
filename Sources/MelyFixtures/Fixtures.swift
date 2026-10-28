@@ -412,6 +412,13 @@ public enum Fixtures {
         return (at(10, 30), agenda, tasks)
     }
 
+    /// «Что нового в Mely 1.6» over the sessions page.
+    public static func whatsNewPage(withNotes: Bool = true) -> some View {
+        ClaudeOverview(store: sessions(2), queue: ApprovalQueue(), tabs: IslandTabs(),
+                       whatsNew: AnyView(WhatsNewView(card: .current, tryTasks: {}, done: {}, more: withNotes ? {} : nil)),
+                       open: { _ in }, decide: { _, _ in }, answerInTerminal: { _ in })
+    }
+
     public static func agendaPage(_ agenda: Agenda?, isOn: Bool = true, tasks: [TaskItem]? = nil,
                                   now: Date? = nil) -> some View {
         let tabs = IslandTabs()

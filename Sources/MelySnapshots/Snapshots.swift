@@ -23,6 +23,8 @@ enum Snapshots {
             Snapshot(name: "approval", view: AnyView(Desk { requestCard(question: false) })),
             Snapshot(name: "chat", view: AnyView(Desk { chat(hasKey: true, answer: readmeAnswer) })),
             Snapshot(name: "today", view: AnyView(Desk { calendarAgenda() })),
+            Snapshot(name: "tasks", view: AnyView(Desk { tasksTab() })),
+            Snapshot(name: "day", view: AnyView(Desk(height: 360) { mixedDay() })),
             Snapshot(name: "music", view: AnyView(Desk { miniPlayer() })),
             Snapshot(name: "reminder", view: AnyView(Desk(height: 128) { peekCard(PeekContent(
                 id: "r", symbol: "video.fill", tint: .green, title: "Совещание",
@@ -494,6 +496,49 @@ enum Snapshots {
                               expanded: { EmptyView() })
             .frame(height: 200, alignment: .top).clipped()
             .background(backdrop)
+    }
+
+    /// The "Задачи" tab at 11:49: one overdue, the day with a block and a moment, a sum.
+    @MainActor private static func tasksTab() -> some View {
+        let cal = Calendar.current
+        let day = cal.startOfDay(for: Date())
+        func at(_ hour: Int, _ minute: Int = 0) -> Date { day.addingTimeInterval(TimeInterval(hour * 3600 + minute * 60)) }
+        func task(_ id: String, _ title: String, _ due: TaskDue?, _ p: TaskPriority = .none, tags: [String] = [],
+                  estimate: TaskEstimate? = nil, list: String = "Работа") -> TaskItem {
+            TaskItem(id: id, title: title, due: due, priority: p, marks: TaskMarks(tags: tags, estimate: estimate),
+                     listId: list, listTitle: list)
+        }
+        let items = [
+            task("1", "Оплатить интернет", .day(of: cal.date(byAdding: .day, value: -1, to: day)!), list: "Дом"),
+            task("2", "Подготовить релиз-ноты", .time(at(14, 30)), .high, tags: ["релиз"], estimate: .m45),
+            task("3", "Позвонить в банк", .time(at(16)), list: "Дом"),
+            task("4", "Ответить на ревью", .day(of: day), .medium, tags: ["работа"], estimate: .m30),
+            task("5", "Купить корм", .day(of: day), list: "Дом"),
+        ]
+        let tabs = IslandTabs()
+        tabs.selected = .tasks
+        let defaults = UserDefaults(suiteName: "mely-snapshots-readme-tasks")!
+        defaults.removePersistentDomain(forName: "mely-snapshots-readme-tasks")
+        let settings = TaskSettings(defaults: defaults)
+        return expandedApp(.tasks) {
+            ClaudeOverview(store: SessionStore(), queue: ApprovalQueue(), tabs: tabs,
+                           tasks: AnyView(TasksView(items: items, lists: [TaskList(id: "Работа", title: "Работа"), TaskList(id: "Дом", title: "Дом")],
+                                                    settings: settings, tabs: tabs, now: at(11, 49), actions: TasksActions())),
+                           open: { _ in }, decide: { _, _ in }, answerInTerminal: { _ in })
+        }
+    }
+
+    /// The "Сегодня" tab at 10:30 with tasks in the day: a block at 12:00 between two calls.
+    @MainActor private static func mixedDay() -> some View {
+        let d = Fixtures.mixedDay()
+        let tabs = IslandTabs()
+        tabs.selected = .today
+        return expandedApp(.today) {
+            ClaudeOverview(store: SessionStore(), queue: ApprovalQueue(), tabs: tabs,
+                           today: AnyView(AgendaView(agenda: d.agenda, tasks: TodayTasks(items: d.tasks, toggle: { _, _ in }, open: { _ in }),
+                                                     now: d.now) { _ in }),
+                           open: { _ in }, decide: { _, _ in }, answerInTerminal: { _ in })
+        }
     }
 
     /// The "Сегодня" tab at 11:49 on a working day: on duty all day, the daily done, the
