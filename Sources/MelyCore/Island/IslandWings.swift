@@ -10,7 +10,7 @@ public struct IslandWings: Equatable, Sendable {
 
     /// The user's choice in Settings → «Боковые части челки».
     public enum Mode: String, CaseIterable, Identifiable, Sendable {
-        /// While anything is live: Claude works or waits, music plays, a limit is near.
+        /// While anything is live: Claude works or waits, music plays, a limit is near, a focus runs.
         case whileActive
         /// A few seconds on an event, then just the notch.
         case flash
@@ -59,9 +59,10 @@ public struct IslandWings: Equatable, Sendable {
     }
 
     /// Claude Code keeps something going: a turn runs or waits for the user, or a plan
-    /// limit is near. (Music is added by the app.)
-    public static func live(states: [SessionState], usage: PlanUsage?, now: Date = Date()) -> Bool {
-        states.contains { [.thinking, .working, .waitingApproval, .waitingAnswer].contains($0) }
+    /// limit is near; or a focus session or break runs. (Music is added by the app.)
+    public static func live(states: [SessionState], usage: PlanUsage?, focus: FocusTimer? = nil, now: Date = Date()) -> Bool {
+        focus?.isLive == true
+            || states.contains { [.thinking, .working, .waitingApproval, .waitingAnswer].contains($0) }
             || usage?.current(now: now).isWarning == true
     }
 

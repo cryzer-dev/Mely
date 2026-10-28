@@ -29,7 +29,7 @@ public enum Fixtures {
     public static func expandedApp<C: View>(_ tab: IslandTabs.Tab, geometry: IslandScreenGeometry? = nil,
                                             held: Bool = false, showsUsage: Bool = false, pose: CharacterPose = .idle,
                                             usage: PlanUsageStore? = nil, updateAvailable: Bool = false,
-                                            backdrop: Color = Color(white: 0.85),
+                                            focus: FocusTimer? = nil, backdrop: Color = Color(white: 0.85),
                                             @ViewBuilder content: () -> C) -> some View {
         let p = IslandPresentation(geometry: geometry ?? macBook14.geometry)
         p.mode = .expanded
@@ -37,8 +37,10 @@ public enum Fixtures {
         return IslandRootView(presentation: p, compactLeading: { EmptyView() }, compactTrailing: AnyView(EmptyView()),
                               expanded: {
                                   HStack(alignment: .top, spacing: 12) {
-                                      MelyStage(pose: pose).updatePill(updateAvailable ? "1.4.0" : nil) {}
-                                          .frame(width: 88).padding(.top, 2)
+                                      MelyStage(pose: pose)
+                                          .underMely(focus: focus.map { AnyView(FocusCard(timer: $0, now: Date(), actions: FocusActions())) },
+                                                     update: updateAvailable ? "1.4.0" : nil) {}
+                                          .frame(width: MelyStage.columnWidth).padding(.top, 2)
                                       body
                                   }
                               },
@@ -65,10 +67,11 @@ public enum Fixtures {
 
     /// The compact island: Mely (and a cover) left, the status right.
     public static func compact(_ geometry: IslandScreenGeometry, store: SessionStore, usage: PlanUsageStore?,
-                               music: NowPlayingModel?, backdrop: Color = Color(white: 0.85)) -> some View {
+                               music: NowPlayingModel?, focus: FocusTimer? = nil,
+                               backdrop: Color = Color(white: 0.85)) -> some View {
         let p = IslandPresentation(geometry: geometry)
         p.mode = .compact
-        return IslandRootView(presentation: p, compactLeading: { CompactLeading(music: music ?? NowPlayingModel()) },
+        return IslandRootView(presentation: p, compactLeading: { CompactLeading(music: music ?? NowPlayingModel(), focus: focus.map { FocusModel(timer: $0) }) },
                               compactTrailing: AnyView(CompactSessionStatus(store: store, usage: usage, music: music)),
                               expanded: { EmptyView() })
             .background(backdrop)
@@ -84,6 +87,35 @@ public enum Fixtures {
         return IslandRootView(presentation: p, compactLeading: { EmptyView() }, compactTrailing: AnyView(EmptyView()),
                               expanded: { EmptyView() })
             .background(backdrop)
+    }
+
+    // MARK: Focus
+
+    public enum Focus: String, CaseIterable, Sendable {
+        case working, paused, onBreak, finished, breakOver
+    }
+
+    /// A 40-minute session 21:18 in (18:42 left), on «Отчёт по релизу» unless `task` is nil.
+    public static func focus(_ phase: Focus, task: String? = "Отчёт по релизу", now: Date = Date()) -> FocusTimer {
+        var t = FocusTimer()
+        let start = now.addingTimeInterval(-(21 * 60 + 18))
+        t.start(now: start, duration: 40 * 60, task: task.map { FocusTaskRef(id: "t1", title: $0) })
+        switch phase {
+        case .working:
+            break
+        case .paused:
+            t.pause(now: now)
+        case .onBreak:
+            t.tick(now: start.addingTimeInterval(40 * 60), idleSeconds: 0)
+            t.takeBreak(now: now.addingTimeInterval(-48))
+        case .finished:
+            t.tick(now: start.addingTimeInterval(40 * 60), idleSeconds: 0)
+        case .breakOver:
+            t.tick(now: start.addingTimeInterval(40 * 60), idleSeconds: 0)
+            t.takeBreak(now: now.addingTimeInterval(-5 * 60))
+            t.tick(now: now, idleSeconds: 0)
+        }
+        return t
     }
 
     // MARK: Plan limits
@@ -145,6 +177,14 @@ public enum Fixtures {
             store.apply(.toolStarted(tool: "Edit", input: JSONObject(["file_path": "/w/\(name)/index.ts"])),
                         origin: origin(name, "/w/\(name)"))
         }
+        return store
+    }
+
+    /// A session waiting for an approval.
+    public static func waitingSessions() -> SessionStore {
+        let store = SessionStore()
+        store.apply(.permissionRequest(tool: "Bash", input: JSONObject(["command": "npm test"]), suggestions: JSONObject([:])),
+                    origin: origin("a", "/w/shop"))
         return store
     }
 

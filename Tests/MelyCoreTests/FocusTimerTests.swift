@@ -140,6 +140,14 @@ import Foundation
         #expect(timer.tick(now: at(55), idleSeconds: 0).first == .finished(worked: mins(25)))
     }
 
+    @Test func clock() {
+        #expect(FocusTimer.clock(mins(18.7)) == "18:42")
+        #expect(FocusTimer.clock(0.2) == "0:01")
+        #expect(FocusTimer.clock(0) == "0:00")
+        #expect(FocusTimer.clock(-5) == "0:00")
+        #expect(FocusTimer.clock(mins(65)) == "1:05:00")
+    }
+
     // MARK: 1.2 Away, lock, sleep
 
     @Test func away() {

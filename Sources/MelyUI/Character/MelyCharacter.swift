@@ -40,6 +40,14 @@ public struct MelyCharacter: NSViewRepresentable {
         return view
     }
 
+    /// Bigger than its frame by `CharacterDrawing.overflow` on each side, centred on it: a hop
+    /// lifts the leaf past the frame, and a view clips what it draws to its bounds.
+    public func sizeThatFits(_ proposal: ProposedViewSize, nsView: MelyCharacterView, context: Context) -> CGSize? {
+        guard let w = proposal.width, let h = proposal.height, w.isFinite, h.isFinite else { return nil }
+        let e = CharacterDrawing.overflow * min(w, h)
+        return CGSize(width: w + 2 * e, height: h + 2 * e)
+    }
+
     public func updateNSView(_ view: MelyCharacterView, context: Context) {
         if view.pose != pose { view.pose = pose }
         if view.look != look { view.look = look }
@@ -232,7 +240,7 @@ public final class MelyCharacterView: NSView {
         let shown = pose == .sleeping && pointerNear ? .idle : pose
         CharacterDrawing(appearance: character, pose: shown, gaze: look == .ahead ? nil : gaze,
                          t: now, tint: tint, emote: emote)
-            .draw(in: cg, size: bounds.size)
+            .draw(overflowing: cg, size: bounds.size)
     }
 }
 
@@ -289,12 +297,28 @@ public struct MelyCharacterFrame: View {
     }
 
     public var body: some View {
-        Canvas { ctx, size in
-            let drawing = CharacterDrawing(appearance: appearance ?? current, pose: pose, gaze: gaze, t: time, tint: tint,
-                                           emote: dizzy ? CharacterEmote(kind: .dizzy, start: 0, duration: 99)
-                                               : reaction.map { CharacterEmote(kind: $0.kind, start: time - 0.35 * $0.duration, duration: $0.duration) })
-            ctx.withCGContext { cg in MainActor.assumeIsolated { drawing.draw(in: cg, size: size) } }
+        // Past its frame on each side, like the live one: a hop must not cut the leaf.
+        CharacterOverflow {
+            Canvas { ctx, size in
+                let drawing = CharacterDrawing(appearance: appearance ?? current, pose: pose, gaze: gaze, t: time, tint: tint,
+                                               emote: dizzy ? CharacterEmote(kind: .dizzy, start: 0, duration: 99)
+                                                   : reaction.map { CharacterEmote(kind: $0.kind, start: time - 0.35 * $0.duration, duration: $0.duration) })
+                ctx.withCGContext { cg in MainActor.assumeIsolated { drawing.draw(overflowing: cg, size: size) } }
+            }
         }
+    }
+}
+
+/// Lays its one child out bigger than itself by `CharacterDrawing.overflow` on each side.
+struct CharacterOverflow: Layout {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        proposal.replacingUnspecifiedDimensions()
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let e = CharacterDrawing.overflow * min(bounds.width, bounds.height)
+        subviews.first?.place(at: CGPoint(x: bounds.minX - e, y: bounds.minY - e), anchor: .topLeading,
+                              proposal: ProposedViewSize(width: bounds.width + 2 * e, height: bounds.height + 2 * e))
     }
 }
 
@@ -308,6 +332,20 @@ struct CharacterDrawing {
     let t: TimeInterval
     var tint: CGColor? = nil
     var emote: CharacterEmote? = nil
+
+    /// Room around the character's frame, of its side: a hop with a stretch lifts the leaf
+    /// about a fifth above it.
+    static let overflow: CGFloat = 0.25
+
+    /// Draws into an area grown by `overflow` on each side (the live view, the frames):
+    /// the character keeps the size and place of the frame inside it.
+    @MainActor func draw(overflowing cg: CGContext, size: CGSize) {
+        let e = Self.overflow * min(size.width, size.height) / (1 + 2 * Self.overflow)
+        cg.saveGState()
+        cg.translateBy(x: e, y: e)
+        draw(in: cg, size: CGSize(width: size.width - 2 * e, height: size.height - 2 * e))
+        cg.restoreGState()
+    }
 
     static let ink = rgb(0.24, 0.16, 0.15)
     static let blush = rgb(1.0, 0.55, 0.55)

@@ -24,19 +24,20 @@ public enum LayoutMatrix {
     public static var all: [LayoutVariant] {
         Fixtures.screens.flatMap { screen -> [LayoutVariant] in
             let groups: [[LayoutVariant]] = [header(screen), sessions(screen), chat(screen), today(screen), tasks(screen), messages(screen),
-                                             music(screen), requests(screen), compact(screen), peeks(screen)]
+                                             music(screen), requests(screen), compact(screen), focus(screen), peeks(screen)]
             return groups.flatMap { $0 }
         }
     }
 
     static func expanded(_ name: String, _ screen: Fixtures.Screen, _ tab: IslandTabs.Tab,
                          usage: Fixtures.Usage = .header, held: Bool = false, showsUsage: Bool = false,
-                         updateAvailable: Bool = false, then: (@MainActor () -> Void)? = nil,
+                         updateAvailable: Bool = false, focus: FocusTimer? = nil, then: (@MainActor () -> Void)? = nil,
                          page: @escaping @MainActor () async -> some View) -> LayoutVariant {
         LayoutVariant("\(name)_\(screen.name)", then: then) {
             let content = await page()
             return AnyView(Fixtures.expandedApp(tab, geometry: screen.geometry, held: held, showsUsage: showsUsage,
-                                                usage: Fixtures.usage(usage), updateAvailable: updateAvailable) { content })
+                                                usage: Fixtures.usage(usage), updateAvailable: updateAvailable,
+                                                focus: focus) { content })
         }
     }
 
@@ -269,6 +270,39 @@ public enum LayoutMatrix {
             LayoutVariant("Compact_Spent_\(screen.name)") {
                 AnyView(Fixtures.compact(screen.geometry, store: Fixtures.sessions(1), usage: Fixtures.usage(.weekSpent),
                                          music: Fixtures.music(.video)))
+            },
+        ]
+    }
+
+    /// The timer left, around Mely, in place of the cover; a waiting request right. The card
+    /// under Mely, with and without a task, on the shortest page, above «Обновить».
+    static func focus(_ screen: Fixtures.Screen) -> [LayoutVariant] {
+        let wings: [(String, Fixtures.Focus)] = [("Working", .working), ("Break", .onBreak), ("Paused", .paused)]
+        return wings.map { name, phase in
+            LayoutVariant("Focus_Wing_\(name)_\(screen.name)") {
+                AnyView(Fixtures.compact(screen.geometry, store: Fixtures.sessions(1), usage: Fixtures.usage(.normal),
+                                         music: Fixtures.music(.track), focus: Fixtures.focus(phase)))
+            }
+        } + [
+            LayoutVariant("Focus_Wing_Request_\(screen.name)") {
+                AnyView(Fixtures.compact(screen.geometry, store: Fixtures.waitingSessions(), usage: nil, music: nil,
+                                         focus: Fixtures.focus(.working)))
+            },
+        ] + Fixtures.Focus.allCases.map { phase in
+            expanded("Focus_Card_\(phase.rawValue)", screen, .sessions, focus: Fixtures.focus(phase)) {
+                Fixtures.sessionsPage(Fixtures.sessions(1))
+            }
+        } + [
+            expanded("Focus_Card_NoTask", screen, .sessions, focus: Fixtures.focus(.working, task: nil)) {
+                Fixtures.sessionsPage(Fixtures.sessions(1))
+            },
+            expanded("Focus_Card_LongTask", screen, .sessions,
+                     focus: Fixtures.focus(.paused, task: "Подготовить квартальный отчёт для совета директоров и разослать")) {
+                Fixtures.sessionsPage(Fixtures.sessions(1))
+            },
+            // The shortest page: the card and «Обновить» under it still fit the island.
+            expanded("Focus_Card_Update", screen, .sessions, usage: .none, updateAvailable: true, focus: Fixtures.focus(.working)) {
+                Fixtures.sessionsPage(SessionStore())
             },
         ]
     }

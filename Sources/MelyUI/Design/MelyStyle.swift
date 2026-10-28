@@ -56,6 +56,10 @@ public enum MelyTint {
     public static let error = Color(red: 1.0, green: 0.38, blue: 0.35)
     public static let limit = Color(red: 0.95, green: 0.75, blue: 0.2)
     public static let music = Color(red: 0.93, green: 0.36, blue: 0.6)
+    /// A focus session: a warm orange, redder than an approval; red means an error.
+    public static let focus = Color(red: 1.0, green: 0.48, blue: 0.28)
+    /// A focus break.
+    public static let rest = Color(red: 0.3, green: 0.8, blue: 0.76)
 }
 
 public enum MelyMotion {

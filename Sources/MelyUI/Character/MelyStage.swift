@@ -8,7 +8,12 @@ public struct MelyStage: View {
     let size: CGFloat
     @Environment(\.characterDrag) private var drag
 
-    public init(pose: CharacterPose, size: CGFloat = 70) {
+    /// The big Mely's size in the open island.
+    public static let defaultSize: CGFloat = 80
+    /// The left column of the open island: the stage, and what hangs under it.
+    public static let columnWidth: CGFloat = (defaultSize * 1.25).rounded()
+
+    public init(pose: CharacterPose, size: CGFloat = MelyStage.defaultSize) {
         self.pose = pose
         self.size = size
     }

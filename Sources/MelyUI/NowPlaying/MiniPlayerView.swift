@@ -217,22 +217,37 @@ struct Artwork: View {
 }
 
 /// Left of the compact island: Mely always, and the cover next to it while music plays.
+/// A focus takes the cover's place: Mely in its ring, the time beside her.
 public struct CompactLeading: View {
     let music: NowPlayingModel?
     let pose: CharacterPose
+    let focus: FocusModel?
     @Environment(\.islandCharacterSize) private var size
     @Environment(\.characterDrag) private var drag
 
-    public init(music: NowPlayingModel?, pose: CharacterPose = .idle) {
+    public init(music: NowPlayingModel?, pose: CharacterPose = .idle, focus: FocusModel? = nil) {
         self.music = music
         self.pose = pose
+        self.focus = focus
     }
 
     public var body: some View {
+        if let focus, focus.timer.isLive {
+            CompactFocus(model: focus) { mely }
+        } else {
+            withMusic
+        }
+    }
+
+    /// Out on the desktop, Mely is not in the notch too.
+    private var mely: some View {
+        MelyCharacter(pose: pose).frame(width: size, height: size)
+            .opacity(drag?.isAway == true ? 0 : 1)
+    }
+
+    private var withMusic: some View {
         HStack(spacing: 6) {
-            // Out on the desktop, Mely is not in the notch too.
-            MelyCharacter(pose: pose).frame(width: size, height: size)
-                .opacity(drag?.isAway == true ? 0 : 1)
+            mely
             if let np = music?.current, np.isPlaying, let data = np.artwork, let image = NSImage(data: data) {
                 Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
                     .frame(width: size * 0.8, height: size * 0.8)

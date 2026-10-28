@@ -64,15 +64,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         desktopMely = desktop
         island = IslandWindowController(
-            compactLeading: { [nowPlaying] in
+            compactLeading: { [nowPlaying, focus] in
                 WithCharacter(settings: character, desktop: desktop) {
-                    LivePose(sessions: sessions, nowPlaying: nowPlaying) { CompactLeading(music: nowPlaying.model, pose: $0) }
+                    LivePose(sessions: sessions, nowPlaying: nowPlaying) { CompactLeading(music: nowPlaying.model, pose: $0, focus: focus.model) }
                 }
             },
             compactTrailing: AnyView(CompactSessionStatus(store: store, usage: sessions.usage, music: nowPlaying.model)),
-            expanded: { [chat, notifications, calendar, reminders, nowPlaying, tabs, updateState, inbox, inboxSettings, telemetry, whatsNew] in
+            expanded: { [chat, notifications, calendar, reminders, nowPlaying, focus, tabs, updateState, inbox, inboxSettings, telemetry, whatsNew] in
                 WithCharacter(settings: character, desktop: desktop) { ExpandedIsland(sessions: sessions, chat: chat, notifications: notifications, calendar: calendar,
-                               reminders: reminders, nowPlaying: nowPlaying, whatsNew: whatsNew,
+                               reminders: reminders, nowPlaying: nowPlaying, focus: focus, whatsNew: whatsNew,
                                tryTasks: { [weak self] in self?.tryTasks() }, tabs: tabs, updates: updateState,
                                inbox: inbox, inboxSettings: inboxSettings, count: { telemetry.count($0) },
                                enableCalendar: { [weak self] in
@@ -92,7 +92,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         island?.wingsPinned = { [weak sessions] in !(sessions?.queue.requests.isEmpty ?? true) }
         island?.wingsLive = { [weak sessions, weak self] in
             guard let sessions else { return false }
-            return IslandWings.live(states: sessions.store.sessions.map(\.state), usage: sessions.usage.usage)
+            return IslandWings.live(states: sessions.store.sessions.map(\.state), usage: sessions.usage.usage,
+                                    focus: self?.focus.model.timer)
                 || self?.nowPlaying.model.current?.isPlaying == true
         }
         // Approvals and questions hold the island; so does typing in the chat or the tasks,
@@ -156,6 +157,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         registry.register(reminders)
         registry.register(nowPlaying)
         registry.register(focus)
+        // A session starting is worth seeing: the wings come out with the timer.
+        focus.onEvent = { [weak self] event in
+            if event == .started { self?.island?.flashWings() }
+        }
         nowPlaying.peek = { [weak self] in self?.island?.showPeek($0, for: .seconds(4)) }
         reminders.peek = { [weak self] in self?.island?.showPeek($0, for: .seconds(4)) }
         calendar.peek = { [weak self] content in
@@ -403,6 +408,7 @@ private struct ExpandedIsland: View {
     let calendar: CalendarIntegration
     let reminders: RemindersIntegration
     let nowPlaying: NowPlayingIntegration
+    let focus: FocusIntegration
     let whatsNew: WhatsNewState
     /// «Попробовать задачи» on «Что нового».
     let tryTasks: () -> Void
@@ -422,8 +428,8 @@ private struct ExpandedIsland: View {
                 ChatAwarePose(conversation: tabs.selected == .chat ? chat.conversation : nil,
                               fallback: reminders.celebrating ? TaskCelebration.pose(pose) : pose)
             }
-            .updatePill(updates.pendingVersion, action: updates.installNow)
-            .frame(width: 88)
+            .underMely(focus: focusCard, update: updates.pendingVersion, action: updates.installNow)
+            .frame(width: MelyStage.columnWidth)
             .padding(.top, 14)
             content
         }
@@ -487,6 +493,21 @@ private struct ExpandedIsland: View {
 }
 
 extension ExpandedIsland {
+    /// Under Mely while a focus runs, its break, and the end until answered.
+    var focusCard: AnyView? {
+        guard focus.status == .running, FocusCard.shows(focus.model.timer) else { return nil }
+        let focus = focus
+        var actions = FocusActions()
+        actions.pause = { focus.pause() }
+        actions.resume = { focus.resume() }
+        actions.extend = { focus.extend(minutes: $0) }
+        actions.stop = { focus.stopSession() }
+        actions.takeBreak = { focus.takeBreak() }
+        actions.skipBreak = { focus.skipBreak() }
+        actions.continueFocus = { focus.continueFocus() }
+        return AnyView(LiveFocusCard(model: focus.model, actions: actions))
+    }
+
     /// «Подробнее ↗»: this release's page, when the version has one.
     var whatsNewNotes: (() -> Void)? {
         guard let url = updates.notesURL(for: AppInfo.version) else { return nil }

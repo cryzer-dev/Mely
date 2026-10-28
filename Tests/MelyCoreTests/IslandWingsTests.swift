@@ -43,6 +43,18 @@ import Foundation
         #expect(!IslandWings.live(states: [.idle, .finished(summary: "")], usage: nil, now: t0))
         let near = PlanUsage(fiveHour: PlanWindow(usedPercent: 85, resetsAt: t0.addingTimeInterval(3600)), sevenDay: nil, updatedAt: t0)
         #expect(IslandWings.live(states: [], usage: near, now: t0))
+        // A focus session, paused or not, and its break; not the time after it ended.
+        var focus = FocusTimer()
+        #expect(!IslandWings.live(states: [], usage: nil, focus: focus, now: t0))
+        focus.start(now: t0, duration: 60)
+        #expect(IslandWings.live(states: [], usage: nil, focus: focus, now: t0))
+        focus.pause(now: t0)
+        #expect(IslandWings.live(states: [], usage: nil, focus: focus, now: t0))
+        focus.resume(now: t0)
+        focus.tick(now: t0.addingTimeInterval(60), idleSeconds: 0)
+        #expect(!IslandWings.live(states: [], usage: nil, focus: focus, now: t0))
+        focus.takeBreak(now: t0)
+        #expect(IslandWings.live(states: [], usage: nil, focus: focus, now: t0))
     }
 
     @Test func onlyANewTurnFlashes() {

@@ -43,20 +43,8 @@ public struct UpdatePill: View {
 }
 
 public extension View {
-    /// The big Mely with «Обновить» under it while `version` waits. An overlay below the
-    /// stage: it tells the island how low it reaches, and a short page grows to fit it.
+    /// The big Mely with «Обновить» under it while `version` waits (see `underMely`).
     func updatePill(_ version: String?, action: @escaping () -> Void) -> some View {
-        overlay(alignment: .bottom) {
-            if let version {
-                UpdatePill(version: version, action: action)
-                    .background(GeometryReader { g in
-                        Color.clear.preference(key: IslandColumnHeightKey.self,
-                                               value: g.frame(in: .named(IslandColumnHeightKey.space)).maxY)
-                    })
-                    .offset(y: UpdatePill.drop)
-                    .transition(.scale(scale: 0.8).combined(with: .opacity))
-            }
-        }
-        .animation(MelyMotion.tab, value: version)
+        underMely(focus: nil, update: version, action: action)
     }
 }

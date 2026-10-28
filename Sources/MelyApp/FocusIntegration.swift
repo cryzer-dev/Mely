@@ -16,8 +16,12 @@ final class FocusIntegration: Integration {
     let displayName = "Фокус"
     let summary = "Таймер в челке, тишина для сообщений и сколько реально ушло на задачу"
     private(set) var status: IntegrationStatus = .off
-    /// The current session or break; idle while off.
-    private(set) var timer = FocusTimer()
+    /// The current session or break, for the notch; idle while off.
+    let model = FocusModel()
+    private var timer: FocusTimer {
+        get { model.timer }
+        set { model.timer = newValue }
+    }
     /// Nil while off: switched off, the integration holds nothing.
     private(set) var log: FocusLog?
 

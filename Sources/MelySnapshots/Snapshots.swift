@@ -102,6 +102,7 @@ enum Snapshots {
                 Fixtures.sessionsPage(SessionStore())
             }.environment(\.characterDrag, CharacterDrag(isAway: true, began: { _ in }, moved: { _ in }, ended: { _ in },
                                                           callHome: {})))),
+            Snapshot(name: "Focus_Picker", view: AnyView(focusPicker())),
             Snapshot(name: "Settings_Updates", view: AnyView(updateSettings())),
             Snapshot(name: "Settings_Tasks", view: AnyView(tasksSettings())),
             Snapshot(name: "Notifications_Tab", view: AnyView(messagesTab())),
@@ -812,7 +813,7 @@ enum Snapshots {
                               expanded: {
                                   // As the app lays it out: the big Mely left, a little Mely per session.
                                   HStack(alignment: .top, spacing: 12) {
-                                      MelyStage(pose: .worried).frame(width: 88).padding(.top, 2)
+                                      MelyStage(pose: .worried).frame(width: MelyStage.columnWidth).padding(.top, 2)
                                       // Through the overview, as the app does: the island fits the page.
                                       ClaudeOverview(store: store, queue: ApprovalQueue(), tabs: IslandTabs(),
                                                      open: { _ in }, decide: { _, _ in }, answerInTerminal: { _ in })
@@ -910,5 +911,20 @@ private struct Card<Content: View>: View {
             .background(Color(white: 0.06))
             .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
             .padding(1)
+    }
+
+}
+
+extension Snapshots {
+    /// «Фокус» and «▶︎»: the last length first; «Своё…» typed; «Заменить» while one runs.
+    @MainActor private static func focusPicker() -> some View {
+        HStack(alignment: .top, spacing: 16) {
+            FocusPicker(choices: [40, 25, 30, 50]) { _ in }
+            FocusPicker(choices: [25, 30, 40, 50], task: "Отчёт по релизу", typed: "7") { _ in }
+            FocusReplaceConfirm(current: "Отчёт по релизу", replace: {}, cancel: {})
+        }
+        .background(.background)
+        .padding(16)
+        .background(backdrop)
     }
 }
