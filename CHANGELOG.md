@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.6.0](https://github.com/cryzer-dev/Mely/compare/v1.5.0...v1.6.0) (2026-10-28)
+
+
+### Новое
+
+* **Tasks:** Быстрый ввод ([9149180](https://github.com/cryzer-dev/Mely/commit/91491805678a6de8bc35c79960cbff62f8fa487a))
+* **Tasks:** Вкладка "Сегодня" ([26999a4](https://github.com/cryzer-dev/Mely/commit/26999a41eca5a572a38f7e2eba8484d0baefb7c8))
+* **Tasks:** Вкладка задачи ([94b0584](https://github.com/cryzer-dev/Mely/commit/94b05842388a68455160ee40b948857bc125b8f6))
+* **Tasks:** Добавлено напоминания о задачах ([655835a](https://github.com/cryzer-dev/Mely/commit/655835a2867238df09cb8837098729e37faf1033))
+* **Tasks:** Карточка «Что нового» после обновления ([982d75a](https://github.com/cryzer-dev/Mely/commit/982d75a6e89d5c005407c7c17e13279e8246e839))
+* **Tasks:** Модель в MelyCore ([5c3f737](https://github.com/cryzer-dev/Mely/commit/5c3f7378117f571065a9b03f190de0e61dd83fb2))
+* **Tasks:** Окно настроек задач ([31cd25d](https://github.com/cryzer-dev/Mely/commit/31cd25d297adfaf1f2190c4ba552992cdd342993))
+* **Tasks:** Разрешение доступов и каркас ([9e76fa6](https://github.com/cryzer-dev/Mely/commit/9e76fa653b1ad5e922fd7af26ebdc091cde970cd))
+* **Tasks:** Чтение и запись напоминания ([e3f6a1a](https://github.com/cryzer-dev/Mely/commit/e3f6a1a827b4ee316dec102a2b6e172b3420d2ee))
+
 ## [1.5.0](https://github.com/cryzer-dev/Mely/compare/v1.4.0...v1.5.0) (2026-10-27)
 
 
