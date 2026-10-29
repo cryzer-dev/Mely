@@ -388,6 +388,103 @@ public struct FocusStartPopover: View {
     }
 }
 
+// MARK: - From the tabs
+
+/// Starting a session from a tab: the picker, or first «Заменить» while one runs.
+public struct FocusLauncher {
+    public let running: FocusTimer?
+    public let choices: [Int]
+    /// The length picked, the task (nil from «Сегодня») and whether a running session ends first.
+    public let start: (_ minutes: Int, _ task: FocusTaskRef?, _ replace: Bool) -> Void
+
+    public init(running: FocusTimer?, choices: [Int], start: @escaping (Int, FocusTaskRef?, Bool) -> Void) {
+        self.running = running
+        self.choices = choices
+        self.start = start
+    }
+}
+
+/// The "Задачи" tab with the focus on: «▶︎» on a task and «ушло N» under it.
+public struct TasksFocus {
+    public let launcher: FocusLauncher
+    /// `taskId → worked`, from the log.
+    public let spent: [String: TimeInterval]
+
+    public init(launcher: FocusLauncher, spent: [String: TimeInterval]) {
+        self.launcher = launcher
+        self.spent = spent
+    }
+}
+
+/// The "Сегодня" tab with the focus on: the day so far and «Фокус».
+public struct TodayFocus {
+    public let launcher: FocusLauncher
+    /// The log: the day is counted at the view's clock, so it resets at midnight.
+    public let records: [FocusRecord]
+
+    public init(launcher: FocusLauncher, records: [FocusRecord]) {
+        self.launcher = launcher
+        self.records = records
+    }
+}
+
+/// A button that opens the picker in a popover.
+struct FocusStartButton<Label: View>: View {
+    let launcher: FocusLauncher
+    let task: FocusTaskRef?
+    @ViewBuilder let label: (_ picking: Bool) -> Label
+    @State private var picking = false
+
+    var body: some View {
+        Button { picking = true } label: { label(picking) }
+            .buttonStyle(.plain)
+            .popover(isPresented: $picking, arrowEdge: .bottom) {
+                FocusStartPopover(running: launcher.running, choices: launcher.choices, task: task?.title) { minutes, replace in
+                    picking = false
+                    launcher.start(minutes, task, replace)
+                } cancel: {
+                    picking = false
+                }
+            }
+    }
+}
+
+/// «Фокус сегодня · 2 ч 10 мин · 4 сессии» and «Фокус», on top of the "Сегодня" tab.
+struct FocusDayRow: View {
+    let focus: TodayFocus
+    let now: Date
+
+    var body: some View {
+        let day = FocusStats.today(records: focus.records, now: now)
+        HStack(spacing: MelySpace.s) {
+            Image(systemName: "timer").font(.system(size: MelyType.footnote, weight: .semibold))
+                .foregroundStyle(MelyTint.focus)
+            Text(day.sessions > 0 ? day.label : "Фокуса сегодня не было")
+                .font(.system(size: MelyType.footnote))
+                .foregroundStyle(.white.opacity(day.sessions > 0 ? MelyInk.strong : MelyInk.tertiary))
+                .lineLimit(1).truncationMode(.tail)
+                .layoutProbe("today.focus.label", inside: "today.focus")
+            Spacer(minLength: 4)
+            FocusStartButton(launcher: focus.launcher, task: nil) { _ in
+                HStack(spacing: 4) {
+                    Image(systemName: "play.fill").font(.system(size: MelyType.micro, weight: .bold))
+                    Text("Фокус")
+                }
+                .font(.system(size: MelyType.footnote, weight: .semibold))
+                .foregroundStyle(.black)
+                .padding(.horizontal, 10).padding(.vertical, 4)
+                .background(MelyTint.focus, in: Capsule())
+                .fixedSize()
+            }
+            .help("Начать фокус")
+            .layoutProbe("today.focus.start", inside: "today.focus", checksWhole: true)
+        }
+        .padding(.horizontal, 10).padding(.vertical, 5)
+        .background(.white.opacity(MelyFill.card), in: RoundedRectangle(cornerRadius: MelyRadius.medium))
+        .layoutProbe("today.focus", inside: "content")
+    }
+}
+
 // MARK: - Under Mely
 
 public extension View {

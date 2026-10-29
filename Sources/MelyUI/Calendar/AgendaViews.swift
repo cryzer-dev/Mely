@@ -8,6 +8,8 @@ public struct AgendaView: View {
     let agenda: Agenda?
     let isOn: Bool
     let tasks: TodayTasks?
+    /// The day's focus and «Фокус» on top, while the focus is on.
+    let focus: TodayFocus?
     let enable: () -> Void
     let join: (CalendarEvent) -> Void
     /// A fixed clock (the README picture); nil: the real one.
@@ -15,11 +17,12 @@ public struct AgendaView: View {
     /// What a line of the day holds inside its padding: two lines of text.
     static let rowHeight: CGFloat = 32
 
-    public init(agenda: Agenda?, isOn: Bool = true, tasks: TodayTasks? = nil, now: Date? = nil,
+    public init(agenda: Agenda?, isOn: Bool = true, tasks: TodayTasks? = nil, focus: TodayFocus? = nil, now: Date? = nil,
                 enable: @escaping () -> Void = {}, join: @escaping (CalendarEvent) -> Void) {
         self.agenda = agenda
         self.isOn = isOn
         self.tasks = tasks
+        self.focus = focus
         self.now = now
         self.enable = enable
         self.join = join
@@ -28,6 +31,16 @@ public struct AgendaView: View {
     public var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
             let now = now ?? context.date
+            VStack(alignment: .leading, spacing: 6) {
+                if let focus { FocusDayRow(focus: focus, now: now).islandPart(spacing: 6) }
+                page(now: now)
+            }
+        }
+        .foregroundStyle(.white)
+    }
+
+    @ViewBuilder
+    private func page(now: Date) -> some View {
             if !isOn {
                 // Tasks without the calendar: just them, no offer to connect it.
                 if let tasks { list(nil, tasks, now: now) } else { off }
@@ -45,8 +58,6 @@ public struct AgendaView: View {
                     .islandPart()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-        }
-        .foregroundStyle(.white)
     }
 
     private var off: some View {

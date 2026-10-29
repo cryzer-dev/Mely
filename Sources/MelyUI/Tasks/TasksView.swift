@@ -28,6 +28,8 @@ public struct TasksView: View {
     @Bindable var settings: TaskSettings
     @Bindable var tabs: IslandTabs
     let actions: TasksActions
+    /// «▶︎» and «ушло N», while the focus is on.
+    let focus: TasksFocus?
     /// A fixed clock (snapshots); nil: the real one.
     let now: Date?
 
@@ -39,7 +41,7 @@ public struct TasksView: View {
 
     public init(items: [TaskItem], lists: [TaskList], hasLoaded: Bool = true, settings: TaskSettings, tabs: IslandTabs,
                 now: Date? = nil, draft: QuickTaskDraft = QuickTaskDraft(), showsDone: Bool = false,
-                deleted: String? = nil, actions: TasksActions) {
+                deleted: String? = nil, focus: TasksFocus? = nil, actions: TasksActions) {
         self.items = items
         self.lists = lists
         self.hasLoaded = hasLoaded
@@ -47,6 +49,7 @@ public struct TasksView: View {
         self.tabs = tabs
         self.now = now
         self.actions = actions
+        self.focus = focus
         _draft = State(initialValue: draft)
         _showsDone = State(initialValue: showsDone)
         // Snapshots: the line after a delete.
@@ -149,7 +152,7 @@ public struct TasksView: View {
                                    close: { tabs.openTask = nil }, delete: { delete(item) })
                             .layoutProbe("tasks.editor", inside: "tasks.list")
                     } else {
-                        TaskRow(item: item, now: now, showsList: settings.filter.listId == nil && lists.count > 1,
+                        TaskRow(item: item, now: now, showsList: settings.filter.listId == nil && lists.count > 1, focus: focus,
                                 toggle: { toggle(item) }, openEditor: { tabs.openTask = item.id },
                                 filterTag: { settings.filter.tag = $0 },
                                 menu: { TaskMenu(item: item, now: now, actions: actions,
@@ -195,7 +198,7 @@ public struct TasksView: View {
             .layoutProbe("tasks.done.header", inside: container)
             if showsDone {
                 ForEach(done) { item in
-                    TaskRow(item: item, now: now, showsList: settings.filter.listId == nil && lists.count > 1,
+                    TaskRow(item: item, now: now, showsList: settings.filter.listId == nil && lists.count > 1, focus: focus,
                             // Done ones are not edited here: the circle brings one back first.
                             toggle: { toggle(item) }, openEditor: {},
                             filterTag: { settings.filter.tag = $0 },
@@ -325,6 +328,7 @@ private struct TaskRow<MenuItems: View>: View {
     let item: TaskItem
     let now: Date
     let showsList: Bool
+    let focus: TasksFocus?
     let toggle: () -> Void
     let openEditor: () -> Void
     let filterTag: (String) -> Void
@@ -348,13 +352,18 @@ private struct TaskRow<MenuItems: View>: View {
                 let due = item.due.flatMap { TaskBoard.rowLabel($0, estimate: item.estimate, now: now) }
                 // "11:00–11:30" already says how long.
                 let blockShown = item.due?.hasTime == true && !overdue && item.estimate != nil && item.estimate != .overHour
-                if due != nil || item.estimate != nil || !item.tags.isEmpty || showsList {
+                let spent = focus?.spent[item.id].flatMap { $0 >= 60 ? $0 : nil }
+                if due != nil || item.estimate != nil || spent != nil || !item.tags.isEmpty || showsList {
                     HStack(spacing: 5) {
                         if let due {
                             Text(due).foregroundStyle(overdue ? MelyTint.error : .white.opacity(MelyInk.secondary)).fixedSize()
                         }
-                        if let estimate = item.estimate, !blockShown {
+                        if let estimate = item.estimate, !blockShown, spent == nil {
                             Text(estimate.label).foregroundStyle(.white.opacity(MelyInk.secondary)).fixedSize()
+                        }
+                        if let spent {
+                            spentText(spent, estimate: blockShown ? nil : item.estimate).fixedSize()
+                                .layoutProbe("tasks.row.\(item.id).spent", inside: "tasks.row.\(item.id)", checksWhole: true)
                         }
                         ForEach(item.tags, id: \.self) { tag in
                             Button("#\(tag)") { filterTag(tag) }
@@ -373,6 +382,16 @@ private struct TaskRow<MenuItems: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
             .onTapGesture(perform: openEditor)
+            if let focus, !item.isCompleted {
+                FocusStartButton(launcher: focus.launcher, task: FocusTaskRef(id: item.id, title: item.title)) { picking in
+                    Image(systemName: "play.fill").font(.system(size: MelyType.micro, weight: .bold))
+                        .foregroundStyle(MelyTint.focus)
+                        .frame(width: 20, height: 18)
+                        .contentShape(Rectangle())
+                        .opacity(hovering || picking ? 1 : 0)
+                }
+                .help("Фокус на задачу")
+            }
             Menu { menu() } label: {
                 Image(systemName: "ellipsis").font(.system(size: MelyType.footnote, weight: .bold))
                     .foregroundStyle(.white.opacity(MelyInk.secondary))
@@ -388,6 +407,18 @@ private struct TaskRow<MenuItems: View>: View {
         .opacity(item.isCompleted ? 0.45 : 1)
         .onHover { hovering = $0 }
         .contextMenu { menu() }
+    }
+}
+
+private extension TaskRow {
+    /// «~45 мин · ушло 1 ч 10 мин»: past the estimate «ушло» stands out; the words stay plain.
+    func spentText(_ spent: TimeInterval, estimate: TaskEstimate?) -> Text {
+        let over = FocusStats.exceeds(item.estimate, spent: spent)
+        let label = Text(FocusStats.spentLabel(spent))
+            .fontWeight(over ? .semibold : .regular)
+            .foregroundColor(over ? MelyTint.focus : .white.opacity(MelyInk.secondary))
+        guard let estimate else { return label }
+        return Text(estimate.label + " · ").foregroundColor(.white.opacity(MelyInk.secondary)) + label
     }
 }
 

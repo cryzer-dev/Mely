@@ -503,6 +503,7 @@ private struct ExpandedIsland: View {
                            : nil,
                        // Always there: switched off, it offers to connect the calendar.
                        today: AnyView(AgendaView(agenda: calendar.agenda, isOn: calendar.status != .off, tasks: todayTasks,
+                                                 focus: focusLauncher.map { TodayFocus(launcher: $0, records: focus.log?.records ?? []) },
                                                  enable: enableCalendar) { event in
                            if let link = event.meeting { calendar.join(link) }
                        }),
@@ -543,6 +544,16 @@ extension ExpandedIsland {
         return { NSWorkspace.shared.open(url) }
     }
 
+    /// «Фокус» in «Сегодня» and «▶︎» on a task, while the focus is on.
+    var focusLauncher: FocusLauncher? {
+        guard focus.status == .running else { return nil }
+        let focus = focus
+        return FocusLauncher(running: focus.model.timer, choices: focus.settings.pickerChoices) { minutes, task, replace in
+            focus.settings.lastPickedMinutes = minutes
+            if replace { focus.replace(minutes: minutes, task: task) } else { focus.start(minutes: minutes, task: task) }
+        }
+    }
+
     /// Today's tasks under the events, while the tasks are on and shown there.
     var todayTasks: TodayTasks? {
         guard reminders.status == .running, reminders.settings.showsInToday else { return nil }
@@ -570,7 +581,9 @@ extension ExpandedIsland {
         actions.delete = { reminders.delete($0) }
         actions.undoDelete = { reminders.undoDelete($0) }
         return TasksView(items: reminders.items, lists: reminders.lists, hasLoaded: reminders.hasLoaded,
-                         settings: reminders.settings, tabs: tabs, actions: actions)
+                         settings: reminders.settings, tabs: tabs,
+                         focus: focusLauncher.map { TasksFocus(launcher: $0, spent: FocusStats.spentByTask(records: focus.log?.records ?? [])) },
+                         actions: actions)
     }
 }
 

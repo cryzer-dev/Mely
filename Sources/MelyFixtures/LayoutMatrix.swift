@@ -177,12 +177,29 @@ public enum LayoutMatrix {
             expanded("Today_TasksMore", screen, .today) {
                 Fixtures.agendaPage(Fixtures.agenda(1), tasks: Fixtures.tasks(.long) + Fixtures.tasks(.crowded))
             },
+            // «Фокус сегодня · 2 ч 10 мин · 4 сессии» on top of each kind of page.
+            expanded("Today_Focus", screen, .today) {
+                Fixtures.agendaPage(Fixtures.agenda(4), focus: Fixtures.focusRecords([(25, nil), (40, "t3"), (40, nil), (25, nil)]))
+            },
+            expanded("Today_FocusNone", screen, .today) { Fixtures.agendaPage(Fixtures.agenda(0), focus: []) },
+            expanded("Today_FocusOff", screen, .today) { Fixtures.agendaPage(nil, isOn: false, focus: []) },
+            expanded("Today_FocusTasks", screen, .today) {
+                Fixtures.agendaPage(nil, isOn: false, tasks: Fixtures.tasks(.ordinary), focus: Fixtures.focusRecords([(25, nil)]))
+            },
+            expanded("Today_FocusOverflow", screen, .today) {
+                Fixtures.agendaPage(Fixtures.agenda(12, long: true), tasks: Fixtures.tasks(.ordinary),
+                                    focus: Fixtures.focusRecords(Array(repeating: (50, nil), count: 11)))
+            },
         ]
     }
 
     static func tasks(_ screen: Fixtures.Screen) -> [LayoutVariant] {
         [
             expanded("Tasks_Today", screen, .tasks) { Fixtures.tasksPage(Fixtures.tasks(.ordinary)) },
+            expanded("Tasks_Spent", screen, .tasks) { Fixtures.tasksPage(Fixtures.tasks(.ordinary), period: .all, focus: Fixtures.tasksFocus()) },
+            expanded("Tasks_SpentLong", screen, .tasks) {
+                Fixtures.tasksPage(Fixtures.tasks(.long), period: .all, focus: Fixtures.tasksFocus())
+            },
             expanded("Tasks_Soon", screen, .tasks) { Fixtures.tasksPage(Fixtures.tasks(.ordinary), period: .soon) },
             expanded("Tasks_All", screen, .tasks) { Fixtures.tasksPage(Fixtures.tasks(.ordinary), period: .all) },
             expanded("Tasks_Empty", screen, .tasks) { Fixtures.tasksPage(Fixtures.tasks(.empty)) },

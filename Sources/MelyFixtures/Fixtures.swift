@@ -118,6 +118,29 @@ public enum Fixtures {
         return t
     }
 
+    /// «Фокус» in the tabs: the picker does nothing.
+    public static func focusLauncher(running: FocusTimer? = nil) -> FocusLauncher {
+        FocusLauncher(running: running, choices: [25, 30, 40, 50]) { _, _, _ in }
+    }
+
+    /// Sessions logged today (minutes), on the ordinary tasks' ids where given.
+    public static func focusRecords(_ sessions: [(minutes: Double, task: String?)], now: Date = Date()) -> [FocusRecord] {
+        sessions.enumerated().map { i, s in
+            FocusRecord(id: "r\(i)", taskId: s.task, start: now.addingTimeInterval(-Double(sessions.count - i) * 1800),
+                        worked: s.minutes * 60)
+        }
+    }
+
+    /// «ушло»: past the estimate on «Отчёт по релизу» (40 + 30 of ~45), under it on the call,
+    /// two hours on «1 ч+», some on a task without an estimate.
+    public static func tasksFocus() -> TasksFocus {
+        // The long tasks get hours too: the widest «ушло» beside long tags.
+        var sessions: [(minutes: Double, task: String?)] = [(40, "t3"), (30, "t3"), (20, "t2"), (120, "t7"), (25, "t8"), (0.5, "t6")]
+        for i in 0..<14 { sessions.append((Double(65 + i * 7), "l\(i)")) }
+        let records = focusRecords(sessions)
+        return TasksFocus(launcher: focusLauncher(), spent: FocusStats.spentByTask(records: records))
+    }
+
     // MARK: Plan limits
 
     public enum Usage: String, CaseIterable, Sendable {
@@ -408,7 +431,8 @@ public enum Fixtures {
     /// The "Задачи" tab with a filter, an open task or something typed in «+ Задача».
     public static func tasksPage(_ items: [TaskItem], period: TaskFilter.Period = .today, listId: String? = nil, tag: String? = nil,
                                  openTask: String? = nil, typed: String? = nil, chosenList: String? = nil,
-                                 hasLoaded: Bool = true, showsDone: Bool = false, deleted: String? = nil) -> some View {
+                                 hasLoaded: Bool = true, showsDone: Bool = false, deleted: String? = nil,
+                                 focus: TasksFocus? = nil) -> some View {
         let tabs = IslandTabs()
         tabs.selected = .tasks
         tabs.openTask = openTask
@@ -420,7 +444,7 @@ public enum Fixtures {
         return ClaudeOverview(store: SessionStore(), queue: ApprovalQueue(), tabs: tabs,
                               tasks: AnyView(TasksView(items: items, lists: taskLists, hasLoaded: hasLoaded, settings: settings,
                                                        tabs: tabs, draft: draft, showsDone: showsDone, deleted: deleted,
-                                                       actions: TasksActions())),
+                                                       focus: focus, actions: TasksActions())),
                               open: { _ in }, decide: { _, _ in }, answerInTerminal: { _ in })
     }
 
@@ -460,12 +484,14 @@ public enum Fixtures {
     }
 
     public static func agendaPage(_ agenda: Agenda?, isOn: Bool = true, tasks: [TaskItem]? = nil,
-                                  now: Date? = nil) -> some View {
+                                  focus: [FocusRecord]? = nil, now: Date? = nil) -> some View {
         let tabs = IslandTabs()
         tabs.selected = .today
         let today = tasks.map { TodayTasks(items: $0, toggle: { _, _ in }, open: { _ in }) }
         return ClaudeOverview(store: SessionStore(), queue: ApprovalQueue(), tabs: tabs,
-                              today: AnyView(AgendaView(agenda: agenda, isOn: isOn, tasks: today, now: now) { _ in }),
+                              today: AnyView(AgendaView(agenda: agenda, isOn: isOn, tasks: today,
+                                                        focus: focus.map { TodayFocus(launcher: focusLauncher(), records: $0) },
+                                                        now: now) { _ in }),
                               open: { _ in }, decide: { _, _ in }, answerInTerminal: { _ in })
     }
 
