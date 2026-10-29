@@ -74,7 +74,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             expanded: { [chat, notifications, calendar, reminders, nowPlaying, focus, tabs, updateState, inbox, inboxSettings, telemetry, whatsNew] in
                 WithCharacter(settings: character, desktop: desktop) { ExpandedIsland(sessions: sessions, chat: chat, notifications: notifications, calendar: calendar,
                                reminders: reminders, nowPlaying: nowPlaying, focus: focus, whatsNew: whatsNew,
-                               tryTasks: { [weak self] in self?.tryTasks() }, tabs: tabs, updates: updateState,
+                               tryIt: { [weak self] in self?.tryFocus() }, tabs: tabs, updates: updateState,
                                inbox: inbox, inboxSettings: inboxSettings, count: { telemetry.count($0) },
                                enableCalendar: { [weak self] in
                                    guard let self else { return }
@@ -239,13 +239,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     static let updatePeekPrefix = "update-available-"
     static let updatedPeekPrefix = "updated-"
 
-    /// «Попробовать задачи»: on (macOS asks for Reminders once), then the tab.
-    private func tryTasks() {
+    /// «Попробовать фокус»: on (no permission to ask), then «Сегодня» with «Фокус» on top.
+    private func tryFocus() {
         whatsNew.dismiss()
         Task { [weak self] in
             guard let self else { return }
-            if !self.registry.isEnabled(self.reminders.id) { await self.registry.setEnabled(self.reminders.id, true) }
-            if self.reminders.status == .running { self.tabs.showTask(nil) } else { self.openSettings(on: .integrations) }
+            if !self.registry.isEnabled(self.focus.id) { await self.registry.setEnabled(self.focus.id, true) }
+            if self.focus.status == .running { self.tabs.selected = .today } else { self.openSettings(on: .integrations) }
         }
     }
 
@@ -440,8 +440,8 @@ private struct ExpandedIsland: View {
     let nowPlaying: NowPlayingIntegration
     let focus: FocusIntegration
     let whatsNew: WhatsNewState
-    /// «Попробовать задачи» on «Что нового».
-    let tryTasks: () -> Void
+    /// «Попробовать …» on «Что нового».
+    let tryIt: () -> Void
     let tabs: IslandTabs
     let updates: UpdateState
     let inbox: NotificationInbox
@@ -514,7 +514,7 @@ private struct ExpandedIsland: View {
                                                     seek: { nowPlaying.seek(to: $0) },
                                                     openSource: { nowPlaying.openSource($0) }))
                            : nil,
-                       whatsNew: whatsNew.isShowing ? AnyView(WhatsNewView(card: whatsNew.card, tryTasks: tryTasks,
+                       whatsNew: whatsNew.isShowing ? AnyView(WhatsNewView(card: whatsNew.card, tryIt: tryIt,
                                                                            done: { [whatsNew] in whatsNew.dismiss() },
                                                                            more: whatsNewNotes)) : nil,
                        open: { HostActivator.activate($0.host, origin: $0.origin) },

@@ -4,16 +4,16 @@ import MelyCore
 /// «Что нового в Mely 1.6»: the release's tiles, once, in place of the island's page.
 public struct WhatsNewView: View {
     let card: WhatsNew
-    /// «Попробовать задачи»: switches the tasks on if needed and opens them.
-    let tryTasks: () -> Void
+    /// «Попробовать …»: switches the feature on if needed and shows it.
+    let tryIt: () -> Void
     /// «Понятно» and «×».
     let done: () -> Void
     /// «Подробнее ↗»: the release page; nil hides it.
     let more: (() -> Void)?
 
-    public init(card: WhatsNew, tryTasks: @escaping () -> Void, done: @escaping () -> Void, more: (() -> Void)? = nil) {
+    public init(card: WhatsNew, tryIt: @escaping () -> Void, done: @escaping () -> Void, more: (() -> Void)? = nil) {
         self.card = card
-        self.tryTasks = tryTasks
+        self.tryIt = tryIt
         self.done = done
         self.more = more
     }
@@ -36,7 +36,7 @@ public struct WhatsNewView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         // One height for every symbol: the titles stand on one line.
                         Image(systemName: item.symbol).font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(MelyTint.working)
+                            .foregroundStyle(accent)
                             .frame(height: 24, alignment: .leading)
                         Text(item.title).font(.system(size: MelyType.title, weight: .semibold)).lineLimit(1)
                         Text(item.text).font(.system(size: MelyType.footnote)).foregroundStyle(.white.opacity(MelyInk.secondary))
@@ -49,7 +49,7 @@ public struct WhatsNewView: View {
                 }
             }
             HStack(spacing: 8) {
-                button("Попробовать задачи", prominent: true, action: tryTasks)
+                button(card.tryTitle, prominent: true, action: tryIt)
                 button("Понятно", prominent: false, action: done)
                 Spacer(minLength: 4)
                 if let more {
@@ -66,6 +66,13 @@ public struct WhatsNewView: View {
         .layoutProbe("whatsnew", inside: "content")
         .islandPart()
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var accent: Color {
+        switch card.accent {
+        case .working: MelyTint.working
+        case .focus: MelyTint.focus
+        }
     }
 
     private func button(_ title: String, prominent: Bool, action: @escaping () -> Void) -> some View {

@@ -34,8 +34,21 @@ public final class FocusSettings {
     /// «Своё…» accepts this.
     public static let customRange = 5...180
     /// `kVK_ANSI_P`, `controlKey | optionKey`: ⌃⌥F is taken by window managers (Rectangle).
-    public static let defaultHotKey = (code: 35, modifiers: 0x1000 | 0x0800)
+    public static let defaultHotKey = (code: 35, modifiers: FocusHotKey.control | FocusHotKey.option)
 
+    /// The shortcut, both parts saved at once: never registered half changed.
+    public var hotKey: FocusHotKey {
+        get { FocusHotKey(code: hotKeyCode, modifiers: hotKeyModifiers) }
+        set {
+            batching = true
+            hotKeyCode = newValue.code
+            hotKeyModifiers = newValue.modifiers
+            batching = false
+            save()
+        }
+    }
+
+    @ObservationIgnored private var batching = false
     @ObservationIgnored private let defaults: UserDefaults
     private static let key = "focus"
 
@@ -74,6 +87,7 @@ public final class FocusSettings {
     public var awayAfter: TimeInterval { TimeInterval(awayMinutes * 60) }
 
     private func save() {
+        guard !batching else { return }
         var values: [String: Any] = [
             "default": defaultMinutes, "short": shortBreakMinutes, "long": longBreakMinutes, "every": longBreakEvery,
             "autoBreak": autoStartsBreak, "autoNext": autoStartsNext, "hold": holdsMessages, "meetings": warnsMeetings,

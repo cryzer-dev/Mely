@@ -110,3 +110,32 @@ import Foundation
         #expect(reread.pickerChoices == [7, 25, 30, 40, 50])
     }
 }
+
+@Suite struct FocusHotKeyTests {
+    @Test func readsAndRefuses() {
+        let control = FocusHotKey.control, option = FocusHotKey.option
+        #expect(FocusHotKey(code: 35, modifiers: control | option).label == "⌃⌥P")
+        #expect(FocusHotKey(code: 3, modifiers: control | option | FocusHotKey.shift | FocusHotKey.command).label == "⌃⌥⇧⌘F")
+        #expect(FocusHotKey(code: 35, modifiers: control | option).problem == nil)
+        // A key alone or with ⇧ would fire while typing.
+        #expect(FocusHotKey(code: 35, modifiers: 0).problem != nil)
+        #expect(FocusHotKey(code: 35, modifiers: FocusHotKey.shift).problem != nil)
+        // ⌃⌥Space (chat) and ⌃⌥D (desktop) are Mely's.
+        #expect(FocusHotKey(code: 49, modifiers: control | option).problem == "⌃⌥Space уже занято в Mely")
+        #expect(FocusHotKey(code: 2, modifiers: control | option).problem != nil)
+    }
+
+    @MainActor @Test func savedAtOnceAndKept() throws {
+        let name = "mely-tests-focus-hotkey"
+        let defaults = try #require(UserDefaults(suiteName: name))
+        defaults.removePersistentDomain(forName: name)
+        let settings = FocusSettings(defaults: defaults)
+        #expect(settings.hotKey == FocusHotKey(code: 35, modifiers: FocusHotKey.control | FocusHotKey.option))
+        var saves = 0
+        settings.changed = { saves += 1 }
+        settings.hotKey = FocusHotKey(code: 3, modifiers: FocusHotKey.command | FocusHotKey.option)
+        #expect(saves == 1)
+        #expect(FocusSettings(defaults: defaults).hotKey.label == "⌥⌘F")
+        defaults.removePersistentDomain(forName: name)
+    }
+}

@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import CoreGraphics
 import Observation
 import OSLog
@@ -58,6 +59,29 @@ final class FocusIntegration: Integration {
     @ObservationIgnored private var observers: [(NotificationCenter, NSObjectProtocol)] = []
     @ObservationIgnored private var screenLocked = false
     @ObservationIgnored private var ticksSinceSave = 0
+
+    @ObservationIgnored private var settingsWindow: NSWindow?
+
+    var actions: [IntegrationAction] {
+        guard status != .off else { return [] }
+        return [IntegrationAction(id: "settings", title: "Фокус…") { [weak self] in self?.showSettings() }]
+    }
+
+    func showSettings() {
+        settingsWindow?.close()
+        let view = FocusSettingsView(settings: settings) { [weak self] in
+            self?.settingsWindow?.close()
+            self?.settingsWindow = nil
+        }
+        let window = NSWindow(contentViewController: NSHostingController(rootView: view))
+        window.title = "Mely — фокус"
+        window.styleMask = [.titled, .closable]
+        window.isReleasedWhenClosed = false
+        window.center()
+        settingsWindow = window
+        NSApp.activate()
+        window.makeKeyAndOrderFront(nil)
+    }
 
     func start() async {
         guard status != .running else { return }

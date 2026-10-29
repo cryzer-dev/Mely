@@ -67,11 +67,11 @@ public enum Fixtures {
 
     /// The compact island: Mely (and a cover) left, the status right.
     public static func compact(_ geometry: IslandScreenGeometry, store: SessionStore, usage: PlanUsageStore?,
-                               music: NowPlayingModel?, focus: FocusTimer? = nil,
+                               music: NowPlayingModel?, focus: FocusTimer? = nil, pose: CharacterPose = .idle,
                                backdrop: Color = Color(white: 0.85)) -> some View {
         let p = IslandPresentation(geometry: geometry)
         p.mode = .compact
-        return IslandRootView(presentation: p, compactLeading: { CompactLeading(music: music ?? NowPlayingModel(), focus: focus.map { FocusModel(timer: $0) }) },
+        return IslandRootView(presentation: p, compactLeading: { CompactLeading(music: music ?? NowPlayingModel(), pose: pose, focus: focus.map { FocusModel(timer: $0) }) },
                               compactTrailing: AnyView(CompactSessionStatus(store: store, usage: usage, music: music)),
                               expanded: { EmptyView() })
             .background(backdrop)
@@ -479,7 +479,7 @@ public enum Fixtures {
     /// «Что нового в Mely 1.6» over the sessions page.
     public static func whatsNewPage(withNotes: Bool = true) -> some View {
         ClaudeOverview(store: sessions(2), queue: ApprovalQueue(), tabs: IslandTabs(),
-                       whatsNew: AnyView(WhatsNewView(card: .current, tryTasks: {}, done: {}, more: withNotes ? {} : nil)),
+                       whatsNew: AnyView(WhatsNewView(card: .current, tryIt: {}, done: {}, more: withNotes ? {} : nil)),
                        open: { _ in }, decide: { _, _ in }, answerInTerminal: { _ in })
     }
 

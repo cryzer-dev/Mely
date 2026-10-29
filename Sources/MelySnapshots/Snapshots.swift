@@ -25,6 +25,11 @@ enum Snapshots {
             Snapshot(name: "today", view: AnyView(Desk { calendarAgenda() })),
             Snapshot(name: "tasks", view: AnyView(Desk { tasksTab() })),
             Snapshot(name: "day", view: AnyView(Desk(height: 360) { mixedDay() })),
+            Snapshot(name: "focus", view: AnyView(Desk { focusTasks() })),
+            Snapshot(name: "focus-wing", view: AnyView(Desk(height: 64) {
+                Fixtures.compact(Fixtures.macBook14.geometry, store: Fixtures.sessions(1), usage: Fixtures.usage(.normal),
+                                 music: nil, focus: Fixtures.focus(.working), pose: .focused, backdrop: .clear)
+            })),
             Snapshot(name: "music", view: AnyView(Desk { miniPlayer() })),
             Snapshot(name: "reminder", view: AnyView(Desk(height: 128) { peekCard(PeekContent(
                 id: "r", symbol: "video.fill", tint: .green, title: "Совещание",
@@ -105,6 +110,7 @@ enum Snapshots {
             Snapshot(name: "Focus_Picker", view: AnyView(focusPicker())),
             Snapshot(name: "Settings_Updates", view: AnyView(updateSettings())),
             Snapshot(name: "Settings_Tasks", view: AnyView(tasksSettings())),
+            Snapshot(name: "Settings_Focus", view: AnyView(focusSettings())),
             Snapshot(name: "Notifications_Tab", view: AnyView(messagesTab())),
             Snapshot(name: "PlanUsageGauge", view: AnyView(planUsage())),
             Snapshot(name: "Sessions_StaleUsage", view: AnyView(expandedApp(.sessions, pose: .working) {
@@ -299,6 +305,28 @@ enum Snapshots {
     }
 
     /// «Задачи…»: three lists, one hidden, new tasks into «Работа»; light and dark.
+    /// Defaults on the left; on the right a changed rhythm, away off and another shortcut.
+    @MainActor private static func focusSettings() -> some View {
+        func settings(_ name: String) -> FocusSettings {
+            let defaults = UserDefaults(suiteName: name)!
+            defaults.removePersistentDomain(forName: name)
+            return FocusSettings(defaults: defaults)
+        }
+        let plain = settings("mely-snapshots-focus")
+        let changed = settings("mely-snapshots-focus-changed")
+        changed.defaultMinutes = 50
+        changed.shortBreakMinutes = 10
+        changed.longBreakEvery = 3
+        changed.pausesWhenAway = false
+        changed.hotKey = FocusHotKey(code: 3, modifiers: FocusHotKey.control | FocusHotKey.option | FocusHotKey.shift)
+        func column(_ settings: FocusSettings, _ scheme: ColorScheme) -> some View {
+            FocusSettingsView(settings: settings, close: {})
+                .background(scheme == .dark ? Color(white: 0.16) : Color(white: 0.95))
+                .environment(\.colorScheme, scheme)
+        }
+        return HStack(alignment: .top, spacing: 0) { column(plain, .light); column(changed, .dark) }
+    }
+
     @MainActor private static func tasksSettings() -> some View {
         let defaults = UserDefaults(suiteName: "mely-snapshots-tasks")!
         defaults.removePersistentDomain(forName: "mely-snapshots-tasks")
@@ -525,6 +553,39 @@ enum Snapshots {
             ClaudeOverview(store: SessionStore(), queue: ApprovalQueue(), tabs: tabs,
                            tasks: AnyView(TasksView(items: items, lists: [TaskList(id: "Работа", title: "Работа"), TaskList(id: "Дом", title: "Дом")],
                                                     settings: settings, tabs: tabs, now: at(11, 49), actions: TasksActions())),
+                           open: { _ in }, decide: { _, _ in }, answerInTerminal: { _ in })
+        }
+    }
+
+    /// A focus on «Отчёт по релизу» 21 minutes in: the card under Mely, «ушло» on the tasks.
+    @MainActor private static func focusTasks() -> some View {
+        let cal = Calendar.current
+        let day = cal.startOfDay(for: Date())
+        func at(_ hour: Int, _ minute: Int = 0) -> Date { day.addingTimeInterval(TimeInterval(hour * 3600 + minute * 60)) }
+        func task(_ id: String, _ title: String, _ due: TaskDue?, _ p: TaskPriority = .none, tags: [String] = [],
+                  estimate: TaskEstimate? = nil, list: String = "Работа") -> TaskItem {
+            TaskItem(id: id, title: title, due: due, priority: p, marks: TaskMarks(tags: tags, estimate: estimate),
+                     listId: list, listTitle: list)
+        }
+        let items = [
+            task("t1", "Отчёт по релизу", .day(of: day), .medium, tags: ["релиз"], estimate: .m45),
+            task("2", "Подготовить релиз-ноты", .time(at(14, 30)), .high, tags: ["релиз"], estimate: .m30),
+            task("3", "Ответить на ревью", .day(of: day), tags: ["работа"], estimate: .m15),
+            task("4", "Позвонить в банк", .time(at(16)), list: "Дом"),
+        ]
+        let records = Fixtures.focusRecords([(40, "t1"), (20, "2")])
+        let tabs = IslandTabs()
+        tabs.selected = .tasks
+        let defaults = UserDefaults(suiteName: "mely-snapshots-readme-focus")!
+        defaults.removePersistentDomain(forName: "mely-snapshots-readme-focus")
+        let settings = TaskSettings(defaults: defaults)
+        return expandedApp(.tasks, pose: .focused, focus: Fixtures.focus(.working)) {
+            ClaudeOverview(store: SessionStore(), queue: ApprovalQueue(), tabs: tabs,
+                           tasks: AnyView(TasksView(items: items, lists: [TaskList(id: "Работа", title: "Работа"), TaskList(id: "Дом", title: "Дом")],
+                                                    settings: settings, tabs: tabs, now: at(11, 49),
+                                                    focus: TasksFocus(launcher: Fixtures.focusLauncher(),
+                                                                      spent: FocusStats.spentByTask(records: records)),
+                                                    actions: TasksActions())),
                            open: { _ in }, decide: { _, _ in }, answerInTerminal: { _ in })
         }
     }
@@ -844,10 +905,10 @@ enum Snapshots {
     /// The expanded island as the app lays it out (`Fixtures.expandedApp`) on this run's backdrop.
     @MainActor static func expandedApp<C: View>(_ tab: IslandTabs.Tab, geometry: IslandScreenGeometry? = nil,
                                                 held: Bool = false, showsUsage: Bool = false, pose: CharacterPose = .idle,
-                                                updateAvailable: Bool = false,
+                                                updateAvailable: Bool = false, focus: FocusTimer? = nil,
                                                 @ViewBuilder content: () -> C) -> some View {
         Fixtures.expandedApp(tab, geometry: geometry, held: held, showsUsage: showsUsage, pose: pose,
-                             updateAvailable: updateAvailable, backdrop: backdrop, content: content)
+                             updateAvailable: updateAvailable, focus: focus, backdrop: backdrop, content: content)
     }
 
     @MainActor static func header(selected: IslandTabs.Tab, held: Bool = false, showsUsage: Bool = false,
