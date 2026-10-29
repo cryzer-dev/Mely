@@ -34,6 +34,17 @@ final class NotificationMirrorIntegration: Integration {
     /// Apps not to mirror right now; the app keeps it up to date (Reminders while the tasks
     /// show their own due reminders).
     @ObservationIgnored var suppressedApps: () -> Set<String> = { [] }
+    /// A focus session runs: messages go to the list without a preview and are counted;
+    /// once it is over, `onHeld` gets how many came.
+    @ObservationIgnored var holdsPeeks = false {
+        didSet {
+            guard oldValue, !holdsPeeks else { return }
+            let count = hold.release()
+            if count > 0 { onHeld?(count) }
+        }
+    }
+    @ObservationIgnored var onHeld: ((Int) -> Void)?
+    @ObservationIgnored private var hold = MessageHold()
 
     var actions: [IntegrationAction] {
         guard status != .off else { return [] }
@@ -136,7 +147,8 @@ final class NotificationMirrorIntegration: Integration {
             for n in list {
                 let name = Self.appName(n.bundleId)
                 let decision = MirrorDecision.decide(n, apps: settings.apps, suppressed: suppressed, hideText: settings.hideText,
-                                                     quietInFocus: settings.quietInFocus, focusOn: focusOn, appName: name)
+                                                     quietInFocus: settings.quietInFocus, focusOn: focusOn, holding: holdsPeeks,
+                                                     appName: name)
                 // App and outcome only: never the text.
                 log.info("notification from \(n.bundleId, privacy: .public): \(String(describing: decision).prefix(8), privacy: .public)")
                 switch decision {
@@ -146,6 +158,7 @@ final class NotificationMirrorIntegration: Integration {
                     let preview = MirrorDecision.decide(n, apps: settings.apps, hideText: settings.hideText,
                                                         quietInFocus: false, focusOn: false, appName: name)
                     if case .preview(let title, let text) = preview { keep(n, appName: name, title: title, text: text) }
+                    if holdsPeeks { hold.add() }
                 case .preview(let title, let text):
                     keep(n, appName: name, title: title, text: text)
                     peek?(PeekContent(id: "notification-\(n.id)", symbol: "bell.fill", tint: .blue,

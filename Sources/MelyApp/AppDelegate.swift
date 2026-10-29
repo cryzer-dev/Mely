@@ -168,6 +168,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         focus.dismissPeek = { [weak self] in self?.island?.dismissPeek($0) }
         focus.completeTask = { [weak self] id in self?.reminders.setCompleted(id, true) }
+        // Messages wait while a session runs; the summary comes with the break or the end.
+        focus.onChange = { [weak self] in
+            guard let self else { return }
+            self.notifications.holdsPeeks = self.focus.holdsMessages
+        }
+        notifications.onHeld = { [weak self] count in self?.island?.showPeek(FocusPeeks.held(count), for: .seconds(8)) }
+        focus.nextMeeting = { [weak self] after, before in
+            self?.calendar.nextEvent(after: after, before: before).map { FocusMeeting(id: $0.id, title: $0.title, start: $0.start) }
+        }
         nowPlaying.peek = { [weak self] in self?.island?.showPeek($0, for: .seconds(4)) }
         reminders.peek = { [weak self] in self?.island?.showPeek($0, for: .seconds(4)) }
         calendar.peek = { [weak self] content in
@@ -182,6 +191,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         island?.onPeekChoice = { [weak self] peekId, actionId in
             if peekId.hasPrefix(FocusPeeks.prefix) { self?.focus.runPeekAction(peekId, actionId) }
+            if peekId == FocusPeeks.heldId { self?.showNotificationsTab() }
         }
         island?.onPeekAction = { [weak self] id in
             guard let self else { return }
@@ -320,6 +330,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if captureWindow { WindowContext.capture { conversation.offer(context: $0) } }
         tabs.showChat()
         island?.expandForTyping()
+    }
+
+    /// The «Уведомления» tab, open: from the summary of messages held during a session.
+    private func showNotificationsTab() {
+        tabs.selected = .notifications
+        island?.expandForAlert()
     }
 
     /// The very first launch (task 7.6): after the greeting, where things are.

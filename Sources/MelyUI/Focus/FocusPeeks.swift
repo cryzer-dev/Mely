@@ -11,10 +11,19 @@ public enum FocusPeeks {
     public static let breakOverId = "focus-break-over"
     public static let awayId = "focus-away"
     public static func meetingId(_ meeting: String) -> String { "focus-meeting-\(meeting)" }
+    /// The summary of messages held during the session: not a focus preview, the tab's.
+    public static let heldId = "messages-held"
 
     /// The buttons' ids.
     public enum Action: String {
         case takeBreak = "break", more, taskDone = "done", continueFocus = "continue", resume, stop, skip, endNow = "end"
+    }
+
+    /// «Пока ты работал: 3 сообщения» after the session; a click opens the list.
+    public static func held(_ count: Int) -> PeekContent {
+        PeekContent(id: heldId, symbol: "bell.badge.fill", tint: .blue, title: MessageHold.summary(count),
+                    subtitle: "Они во вкладке «Уведомления»",
+                    actions: [PeekAction(id: "show", title: "Показать", isPrimary: true)])
     }
 
     /// Lasting ones stay this long unless answered: the time is up, nothing goes on by itself.

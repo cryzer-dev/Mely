@@ -75,17 +75,46 @@ public enum MirrorDecision: Equatable, Sendable {
 
     /// - Parameter suppressed: apps Mely shows itself right now (Reminders while the tasks
     ///   remind under the notch): never mirrored, so nothing comes twice.
+    /// - Parameter holding: a Mely focus session runs: kept in the list, no preview.
     public static func decide(_ n: MirroredNotification, apps: Set<String>, suppressed: Set<String> = [], hideText: Bool,
-                              quietInFocus: Bool, focusOn: Bool, appName: String) -> MirrorDecision {
+                              quietInFocus: Bool, focusOn: Bool, holding: Bool = false, appName: String) -> MirrorDecision {
         // The database keeps bundle ids lowercased ("com.apple.scripteditor2").
         func has(_ ids: Set<String>) -> Bool { ids.contains { $0.caseInsensitiveCompare(n.bundleId) == .orderedSame } }
         guard has(apps), !has(suppressed) else { return .ignore }
-        if quietInFocus && focusOn { return .collect }
+        if quietInFocus && focusOn || holding { return .collect }
         let title = n.title ?? appName
         if hideText { return .preview(title: title, text: n.subtitle.map { "\(appName) · \($0)" } ?? "Новое уведомление") }
         // A browser puts the site in the subtitle; a messenger the chat or nothing.
         let text = [n.subtitle, n.body].compactMap { $0 }.joined(separator: " — ")
         return .preview(title: title, text: text.isEmpty ? appName : text)
+    }
+}
+
+/// Messages held back from previews while a focus session runs; one summary when it ends.
+public struct MessageHold: Equatable, Sendable {
+    public private(set) var count = 0
+
+    public init() {}
+
+    public mutating func add() { count += 1 }
+
+    /// The count so far, reset.
+    public mutating func release() -> Int {
+        defer { count = 0 }
+        return count
+    }
+
+    /// «Пока ты работал: 3 сообщения».
+    public static func summary(_ n: Int) -> String {
+        let tens = n % 100, ones = n % 10
+        let word: String = if (11...14).contains(tens) { "сообщений" } else {
+            switch ones {
+            case 1: "сообщение"
+            case 2...4: "сообщения"
+            default: "сообщений"
+            }
+        }
+        return "Пока ты работал: \(n) \(word)"
     }
 }
 

@@ -22,6 +22,16 @@ import Foundation
         #expect(empty.nextTomorrow?.title == "Планирование")
     }
 
+    @Test func nextMeetingBeforeTheFocusEnds() {
+        let events = [ev("d", "Отпуск", 0, 24, allDay: true), ev("b", "Ретро", 11.5, 12), ev("a", "Груминг", 11, 11.5),
+                      ev("x", "Стендап", 10, 10.25)]
+        // A session 10:30–11:20: the grooming at 11:00, not the all-day one or the past standup.
+        #expect(CalendarEvent.next(in: events, after: at(10.5), before: at(11.33))?.title == "Груминг")
+        // Ends before 11:00: nothing to warn of.
+        #expect(CalendarEvent.next(in: events, after: at(10.5), before: at(10.9)) == nil)
+        #expect(CalendarEvent.next(in: [ev("d", "Отпуск", 0, 24, allDay: true, day: 1)], after: at(10), before: at(30)) == nil)
+    }
+
     @Test func reminderCountsDownThenCountsUp() {
         let start = Date(timeIntervalSinceReferenceDate: 10_000)
         #expect(MeetingCountdown.text(until: start, now: start.addingTimeInterval(-300)) == "через 5 мин")

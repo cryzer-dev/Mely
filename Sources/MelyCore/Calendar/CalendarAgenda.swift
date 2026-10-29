@@ -30,6 +30,12 @@ public struct CalendarEvent: Identifiable, Equatable, Sendable {
     }
 
     public func isNow(_ now: Date) -> Bool { start <= now && now < end }
+
+    /// The first timed event starting after `after` and before `before` (a focus session's
+    /// end): what to warn of. All-day events are not meetings.
+    public static func next(in events: [CalendarEvent], after: Date, before: Date) -> CalendarEvent? {
+        events.filter { !$0.isAllDay && $0.start > after && $0.start < before }.min { $0.start < $1.start }
+    }
 }
 
 /// Today as the overview shows it: all-day events on top, timed ones in order, the

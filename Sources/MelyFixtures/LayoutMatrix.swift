@@ -350,6 +350,7 @@ public enum LayoutMatrix {
             ("FocusAway", FocusPeeks.away(7 * 60)),
             ("FocusMeeting", FocusPeeks.meeting(FocusMeeting(id: "g", title: "Shared.Пополнение баланса — синк команды платежей",
                                                              start: Date().addingTimeInterval(5 * 60)))),
+            ("FocusHeld", FocusPeeks.held(23)),
             ("Message", PeekContent(id: "m", symbol: "bell.fill", tint: .blue, title: "Аня Смирнова",
                                     subtitle: "Созвон переносим на 15:30, ссылку кину в чат. Если не получится, давай завтра утром до стендапа, я весь день на встречах",
                                     appBundleId: "ru.keepcoder.Telegram", opensApp: true)),

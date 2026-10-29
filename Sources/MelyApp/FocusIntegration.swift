@@ -25,10 +25,22 @@ final class FocusIntegration: Integration {
     }
     /// Nil while off: switched off, the integration holds nothing.
     private(set) var log: FocusLog?
+    /// A session runs and «Тишина во время фокуса» is on: message previews wait. Paused by
+    /// hand, the user is distracted anyway: the summary comes and messages show again; away
+    /// or locked, nobody would see them, so they keep waiting.
+    var holdsMessages: Bool {
+        guard status == .running, settings.holdsMessages else { return false }
+        switch timer.phase {
+        case .working, .paused(.away), .paused(.locked): return true
+        default: return false
+        }
+    }
 
     @ObservationIgnored let settings = FocusSettings()
     /// Every event after it is handled here (sounds, log): previews, the hold on messages.
     @ObservationIgnored var onEvent: ((FocusEvent) -> Void)?
+    /// After every change of the session: the hold on messages follows `holdsMessages`.
+    @ObservationIgnored var onChange: (() -> Void)?
     /// The next meeting starting between now and the end, for «Через 5 мин — …».
     @ObservationIgnored var nextMeeting: ((_ after: Date, _ before: Date) -> FocusMeeting?)?
     /// Previews under the notch («Фокус окончен», «Перерыв окончен», …) and taking one away.
@@ -55,9 +67,13 @@ final class FocusIntegration: Integration {
         for event in events { handle(event) }
         timer.save()
         registerHotKey()
-        settings.changed = { [weak self] in self?.registerHotKey() }
+        settings.changed = { [weak self] in
+            self?.registerHotKey()
+            self?.onChange?()
+        }
         watchLockAndSleep()
         updateTicker()
+        onChange?()
     }
 
     func stop() async {
@@ -70,6 +86,7 @@ final class FocusIntegration: Integration {
         observers = []
         log = nil
         status = .off
+        onChange?()
     }
 
     // MARK: Actions
@@ -112,6 +129,7 @@ final class FocusIntegration: Integration {
         ticksSinceSave = 0
         updateTicker()
         dismissStalePeeks()
+        onChange?()
     }
 
     /// Once a second, only while a session or a break runs.
@@ -148,6 +166,7 @@ final class FocusIntegration: Integration {
         if !events.isEmpty {
             updateTicker()
             dismissStalePeeks()
+            onChange?()
         }
     }
 

@@ -189,6 +189,12 @@ final class CalendarIntegration: Integration {
     }
 
     /// A reminder is gone (closed, joined, over): its join is not needed any more.
+    /// The next meeting starting between the two, from what is loaded: the focus warns of it.
+    func nextEvent(after: Date, before: Date) -> CalendarEvent? {
+        guard status == .running else { return nil }
+        return CalendarEvent.next(in: upcoming, after: after, before: before)
+    }
+
     func forgetPeek(_ id: String) {
         pendingJoins.removeValue(forKey: id)
     }

@@ -141,6 +141,32 @@ private final class FixtureDB {
         #expect(decide(telegram, quiet: false, focus: true) == .preview(title: "Аня", text: "Созвон в 15?"))
     }
 
+    @Test func focusSessionHoldsPreviews() {
+        // Held: no preview, but the list still gets what a preview would show.
+        let held = MirrorDecision.decide(telegram, apps: ["ru.keepcoder.Telegram"], hideText: false, quietInFocus: false,
+                                         focusOn: false, holding: true, appName: "Telegram")
+        #expect(held == .collect)
+        #expect(MirrorDecision.decide(telegram, apps: ["ru.keepcoder.Telegram"], hideText: false, quietInFocus: false,
+                                      focusOn: false, appName: "Telegram") == .preview(title: "Аня", text: "Созвон в 15?"))
+        // An app not mirrored stays out even while held.
+        #expect(MirrorDecision.decide(telegram, apps: [], hideText: false, quietInFocus: false, focusOn: false,
+                                      holding: true, appName: "Telegram") == .ignore)
+        var hold = MessageHold()
+        for _ in 0..<3 { hold.add() }
+        #expect(hold.count == 3)
+        #expect(hold.release() == 3)
+        #expect(hold.count == 0)
+        #expect(hold.release() == 0)
+    }
+
+    @Test func heldSummaryCountsWords() {
+        #expect(MessageHold.summary(1) == "Пока ты работал: 1 сообщение")
+        #expect(MessageHold.summary(3) == "Пока ты работал: 3 сообщения")
+        #expect(MessageHold.summary(5) == "Пока ты работал: 5 сообщений")
+        #expect(MessageHold.summary(12) == "Пока ты работал: 12 сообщений")
+        #expect(MessageHold.summary(21) == "Пока ты работал: 21 сообщение")
+    }
+
     @Test func suppressedAppsAreNotMirrored() {
         let reminder = MirroredNotification(id: 4, bundleId: "com.apple.remindd", title: "Созвон с бухгалтером", subtitle: nil,
                                             body: nil, deliveredAt: Date())
