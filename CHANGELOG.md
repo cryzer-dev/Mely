@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.7.0](https://github.com/cryzer-dev/Mely/compare/v1.6.0...v1.7.0) (2026-10-29)
+
+
+### Новое
+
+* **Focus:** Интеграция «Фокус», горячая клавиша ⌃⌥P и звуки ([d77f321](https://github.com/cryzer-dev/Mely/commit/d77f3217da485073d2a1a3176fc59ff71016feb5))
+* **Focus:** Модель таймера фокуса, журнал и настройки ([6641030](https://github.com/cryzer-dev/Mely/commit/664103033c265ad0acbcc0412b1ae34be350f031))
+* **Focus:** Окно настроек фокуса, раздел в README и «Что нового» в 1.7 ([ffc5bbd](https://github.com/cryzer-dev/Mely/commit/ffc5bbd814bb802e2081b87a6317e3fc83467a0b))
+* **Focus:** Позы «Фокус» и «Перерыв» ([e81a6be](https://github.com/cryzer-dev/Mely/commit/e81a6be9bd1832abbd42581afbd90b4e15a721f5))
+* **Focus:** Превью окончания фокуса, перерыва и встречи ([c0d5677](https://github.com/cryzer-dev/Mely/commit/c0d56770a4e655bf2e9429c0a1f6eae69b83fe6e))
+* **Focus:** Таймер в челке, карточка под Mely и выбор длительности ([fe51169](https://github.com/cryzer-dev/Mely/commit/fe5116976a86bfd59a0e7120b12ad47efbdbfce8))
+* **Focus:** Тишина для сообщений во время фокуса и предупреждение о встрече ([9472067](https://github.com/cryzer-dev/Mely/commit/94720678222eb94e1e27c8e920c045380fb5b8a9))
+* **Focus:** Фокус на задачу, «ушло N» и итог дня во вкладке «Сегодня» ([0051a14](https://github.com/cryzer-dev/Mely/commit/0051a145ac0dbcb59286e1f3c38b6cefe6d656de))
+
 ## [1.6.0](https://github.com/cryzer-dev/Mely/compare/v1.5.0...v1.6.0) (2026-10-28)
 
 
