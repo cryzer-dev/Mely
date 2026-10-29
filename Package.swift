@@ -30,7 +30,7 @@ let package = Package(
         // Sample data and the layout variants, shared by the snapshots and the layout checks.
         .target(name: "MelyFixtures", dependencies: ["MelyCore", "MelyUI"]),
         // Run with scripts/test.sh: it adds the Swift Testing paths the Command Line Tools need.
-        .testTarget(name: "MelyCoreTests", dependencies: ["MelyCore"]),
+        .testTarget(name: "MelyCoreTests", dependencies: ["MelyCore"], resources: [.copy("Fixtures")]),
         // Layout checks: every variant of the island laid out offscreen, its probes checked.
         .testTarget(name: "MelyUITests", dependencies: ["MelyCore", "MelyUI", "MelyFixtures"]),
     ]

@@ -1,0 +1,11 @@
+{
+  "hook_event_name": "Stop",
+  "session_id": "019a2f4e-7c1d-7b3a-9e55-2f8c1d0a4b6e",
+  "turn_id": "019a2f4e-8d02-7c11-a3b4-5e6f7a8b9c0d",
+  "cwd": "/Users/me/work/api",
+  "model": "gpt-5-codex",
+  "permission_mode": "default",
+  "transcript_path": null,
+  "stop_hook_active": false,
+  "last_assistant_message": "Готово, тесты зелёные. Закоммитить?"
+}
