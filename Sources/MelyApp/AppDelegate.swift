@@ -11,7 +11,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let registry = IntegrationRegistry(enabledByDefault: ["claude-code", "claude-chat", "now-playing"])
     private let islandModel = IslandModel()
     private let permissions = SystemPermissions()
-    private let claudeCode = ClaudeCodeIntegration()
+    private let hooks = AgentHookHub()
+    private lazy var claudeCode = ClaudeCodeIntegration(hub: hooks)
+    private lazy var codex = CodexIntegration(hub: hooks)
     private let chat = ClaudeChatIntegration()
     private let notifications = NotificationMirrorIntegration()
     private let calendar = CalendarIntegration()
@@ -123,7 +125,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         desktop.askAbout = { [weak self] app, frame in self?.askAbout(app, frame) }
         desktop.openSettings = { [weak self] in self?.openSettings() }
         desktop.collapseIsland = { [weak self] in self?.island?.collapse() }
-        claudeCode.onEvent = { [weak sessions] event, origin, responder in
+        hooks.onEvent = { [weak sessions] event, origin, responder in
             sessions?.handle(event, origin: origin, responder: responder)
         }
         if let machine = island?.machine {
@@ -146,6 +148,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setUpEditMenu()
         registry.permissions = permissions
         registry.register(claudeCode)
+        registry.register(codex)
         registry.register(chat)
         let inbox = inbox, inboxSettings = inboxSettings
         inboxSettings.changed = { inbox.apply(inboxSettings) }

@@ -4,8 +4,8 @@ import Observation
 import MelyCore
 import MelyUI
 
-/// Claude Code: the hook socket, the relay at ~/.mely/bin/nc-hook and the hooks in
-/// ~/.claude/settings.json (written only after the user confirms the diff).
+/// Claude Code: the relay at ~/.mely/bin/nc-hook and the hooks in ~/.claude/settings.json
+/// (written only after the user confirms the diff); events come through `AgentHookHub`.
 @MainActor
 @Observable
 final class ClaudeCodeIntegration: Integration {
@@ -15,10 +15,12 @@ final class ClaudeCodeIntegration: Integration {
     private(set) var status: IntegrationStatus = .off
 
     @ObservationIgnored private let setup = ClaudeCodeSetup()
-    @ObservationIgnored private var server: HookSocketServer?
+    @ObservationIgnored private let hub: AgentHookHub
     @ObservationIgnored private var changeWindow: NSWindow?
-    /// Receives decoded events on the main actor (sessions, approvals — tasks 2.5–2.7).
-    @ObservationIgnored var onEvent: ((HookEvent, HookOrigin, HookResponder?) -> Void)?
+
+    init(hub: AgentHookHub) {
+        self.hub = hub
+    }
 
     var actions: [IntegrationAction] {
         guard status != .off else { return [] }
@@ -37,33 +39,18 @@ final class ClaudeCodeIntegration: Integration {
         if FileManager.default.fileExists(atPath: bundled.path) {
             try? setup.installRelay(from: bundled)
         }
-        if server == nil {
-            let server = HookSocketServer(path: AppInfo.socketURL.path) { [weak self] payload, responder in
-                let box = JSONObject(payload)
-                Task { @MainActor in
-                    let (event, origin) = HookEvent.decode(box.value)
-                    if let onEvent = self?.onEvent {
-                        onEvent(event, origin, responder)
-                    } else {
-                        responder?.reply(.ask)
-                    }
-                }
-            }
-            do {
-                try server.start()
-                self.server = server
-            } catch {
-                status = .error("Не удалось открыть сокет: \(error.localizedDescription)")
-                return
-            }
+        do {
+            try hub.open(for: .claude)
+        } catch {
+            status = .error("Не удалось открыть сокет: \(error.localizedDescription)")
+            return
         }
         refreshStatus()
         if !setup.hooksInstalled() { presentInstall() }
     }
 
     func stop() async {
-        server?.stop()
-        server = nil
+        hub.close(for: .claude)
         status = .off
     }
 

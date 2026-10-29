@@ -1,8 +1,25 @@
 import Foundation
 
-/// A change to ~/.claude/settings.json waiting for the user's OK.
+/// Another file written with the change (Codex: `config.toml` beside `hooks.json`).
+public struct PendingFileWrite: Sendable {
+    public let url: URL
+    public let newData: Data
+    public let originalBytes: Data?
+
+    public init(url: URL, newData: Data, originalBytes: Data?) {
+        self.url = url
+        self.newData = newData
+        self.originalBytes = originalBytes
+    }
+}
+
+/// A change to ~/.claude/settings.json (or an agent's other settings) waiting for the user's OK.
 public struct PendingSettingsChange: Sendable {
     public let title: String
+    /// What will be written, above the diff; nil: Claude Code's settings.json.
+    public var note: String?
+    /// Written after the main file, each refused if it changed since the preview.
+    public var also: [PendingFileWrite] = []
     /// Changed lines with a little context, `+`/`-` prefixed.
     public let diff: String
     public let newData: Data

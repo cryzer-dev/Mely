@@ -18,7 +18,7 @@ public struct SettingsChangeView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(change.title).font(.title3.weight(.semibold))
-            Text("Mely изменит ~/.claude/settings.json. Перед записью будет сделана резервная копия рядом с файлом, чужие hooks останутся на месте.")
+            Text(change.note ?? "Mely изменит ~/.claude/settings.json. Перед записью будет сделана резервная копия рядом с файлом, чужие hooks останутся на месте.")
                 .font(.callout).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             ScrollView(.vertical) {
