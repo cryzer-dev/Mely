@@ -23,6 +23,9 @@ final class FocusIntegration: Integration {
         get { model.timer }
         set { model.timer = newValue }
     }
+    /// A session just ended: Mely is glad for a moment.
+    private(set) var celebrating = false
+    @ObservationIgnored private var celebration: Task<Void, Never>?
     /// Nil while off: switched off, the integration holds nothing.
     private(set) var log: FocusLog?
     /// A session runs and «Тишина во время фокуса» is on: message previews wait. Paused by
@@ -178,6 +181,7 @@ final class FocusIntegration: Integration {
         case let .finished(worked):
             logger.info("focus finished")
             if settings.playsEndSound { SoundEngine.shared.play(.focusEnd) }
+            celebrate()
             if settings.autoStartsBreak {
                 takeBreak()
                 if timer.phase == .onBreak { show(FocusPeeks.breakStarted(length: timer.breakLength, worked: worked)) }
@@ -202,6 +206,16 @@ final class FocusIntegration: Integration {
             break
         }
         onEvent?(event)
+    }
+
+    private func celebrate() {
+        celebrating = true
+        celebration?.cancel()
+        celebration = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(2.5))
+            guard !Task.isCancelled else { return }
+            self?.celebrating = false
+        }
     }
 
     // MARK: Previews

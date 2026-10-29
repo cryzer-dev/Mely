@@ -75,8 +75,8 @@ extension Species {
     var hasBeak: Bool { false }
     func drawBack(_ c: BodyContext) {}
     func drawFront(_ c: BodyContext) {}
-    /// Asleep, nothing in the paws.
-    func hiddenSlots(_ pose: CharacterPose) -> Set<AccessorySlot> { pose == .sleeping ? [.held] : [] }
+    /// Asleep, nothing in the paws; on a break they hold the mug.
+    func hiddenSlots(_ pose: CharacterPose) -> Set<AccessorySlot> { pose == .sleeping || pose == .resting ? [.held] : [] }
 }
 
 enum SpeciesCatalog {
@@ -235,7 +235,7 @@ struct Lamb: Species {
 
     func hiddenSlots(_ pose: CharacterPose) -> Set<AccessorySlot> {
         // Curled up asleep, the scarf disappears in the wool.
-        pose == .sleeping ? [.held, .neck] : []
+        pose == .sleeping ? [.held, .neck] : pose == .resting ? [.held] : []
     }
 
     private func puffs(_ c: BodyContext) -> [(Double, Double, Double)] {

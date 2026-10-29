@@ -29,6 +29,35 @@ import Foundation
         #expect(pose(CharacterInputs(sessions: [.idle], lastActivity: noon)) == .idle)
     }
 
+    @Test func focusOutranksWorkButNotWhatNeedsTheUser() {
+        let noon = at(14)
+        // Focus and Claude working: focused; a permission or a question: as without the focus.
+        #expect(pose(CharacterInputs(sessions: [.working], lastActivity: noon, focus: .working)) == .focused)
+        #expect(pose(CharacterInputs(sessions: [.finished(summary: "")], lastActivity: noon, focus: .working)) == .focused)
+        #expect(pose(CharacterInputs(sessions: [.working], lastActivity: noon, pendingApprovals: 1, focus: .working)) == .worried)
+        #expect(pose(CharacterInputs(sessions: [.waitingAnswer], lastActivity: noon, focus: .working)) == .curious)
+        #expect(pose(CharacterInputs(sessions: [.error("x")], lastActivity: noon, focus: .working)) == .scared)
+        #expect(pose(CharacterInputs(sessions: [.rateLimited], lastActivity: noon, focus: .resting)) == .sad)
+        // Music, sleep: the focus wins.
+        #expect(pose(CharacterInputs(lastActivity: noon, musicPlaying: true, focus: .resting)) == .resting)
+        #expect(pose(CharacterInputs(focus: .working), 1) == .focused)
+    }
+
+    @Test func focusMoodFollowsThePhase() {
+        let now = at(14)
+        var timer = FocusTimer()
+        #expect(timer.mood == nil)
+        timer.start(now: now, duration: 25 * 60)
+        #expect(timer.mood == .working)
+        timer.pause(now: now.addingTimeInterval(60))
+        #expect(timer.mood == nil)
+        timer.resume(now: now.addingTimeInterval(120))
+        timer.tick(now: now.addingTimeInterval(27 * 60), idleSeconds: 0)
+        #expect(timer.mood == nil)
+        timer.takeBreak(now: now.addingTimeInterval(27 * 60), rhythm: FocusRhythm())
+        #expect(timer.mood == .resting)
+    }
+
     @Test func sleepsWhenQuiet() {
         // 20 quiet minutes: asleep, day or night.
         #expect(pose(CharacterInputs(lastActivity: at(14).addingTimeInterval(-25 * 60))) == .sleeping)

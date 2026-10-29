@@ -398,6 +398,7 @@ struct CharacterDrawing {
             for slot in [AccessorySlot.neck, .eyes, .head, .held] {
                 if let item = outfit[slot] { AccessoryDrawing.draw(item, pen, r, anchors, t: t) }
             }
+            if pose == .resting { drawMug(pen, r) }
         }
         if dizzy { drawDizzyStars(pen, r) } else { drawExtras(pen, r) }
         if let emote, emote.kind == .party { drawConfetti(pen, r, emote.progress(t)) }
@@ -443,8 +444,8 @@ struct CharacterDrawing {
 
     private func motion() -> Motion {
         var m = Motion()
-        // Leans a little towards the pointer, so a glance reads even when tiny.
-        if pose != .sleeping { m.tilt = 3.3 * clampedGaze.x }
+        // Leans a little towards the pointer, so a glance reads even when tiny; focused, less.
+        if pose != .sleeping { m.tilt = 3.3 * clampedGaze.x * (pose == .focused ? 0.4 : 1) }
         let breath = sin(t * 2 * .pi / (pose == .sleeping ? 4.5 : 3.2))
         m.sy = 1 + 0.03 * breath * (pose == .sleeping ? 1.4 : 1)
         m.sx = 1 - 0.015 * breath
@@ -470,6 +471,20 @@ struct CharacterDrawing {
             m.dy = 0.02
         case .working:
             m.tilt += 1.5 * sin(t * 2 * .pi * 0.5)
+        case .focused:
+            // A slow nod every 9 s: still there, at work.
+            let n = t.truncatingRemainder(dividingBy: 9)
+            if n < 0.9 {
+                let k = sin(n / 0.9 * .pi)
+                m.dy += 0.02 * k
+                m.sy *= 1 - 0.03 * k
+            }
+        case .resting:
+            if stretch > 0 {
+                m.sy *= 1 + 0.09 * stretch
+                m.sx *= 1 - 0.05 * stretch
+                m.dy -= 0.02 * stretch
+            }
         case .idle, .sleeping:
             break
         }
@@ -497,6 +512,34 @@ struct CharacterDrawing {
     }
 
     private var dizzy: Bool { emote?.kind == .dizzy }
+
+    /// On a break, a stretch every 20 s: 0 … 1 … 0 over two seconds.
+    private var stretch: Double {
+        // Halfway through the cycle at t = 0: the first stretch comes a while after the break begins.
+        let s = (t + 10).truncatingRemainder(dividingBy: 20)
+        return s < 2 ? sin(s / 2 * .pi) : 0
+    }
+
+    /// A mug of tea held in front, a band in the rest colour; steam rises in `drawExtras`.
+    private func drawMug(_ pen: Pen, _ r: CGRect) {
+        let lw = r.width * 0.022
+        let cup = Self.rgb(0.98, 0.97, 0.95), band = Self.rgb(0.3, 0.8, 0.76)
+        let body = rect(r, 0.42, 0.8, 0.16, 0.14)
+        var handle = Path()
+        handle.addEllipse(in: rect(r, 0.54, 0.83, 0.08, 0.08))
+        pen.stroke(handle, Self.ink, width: lw * 2.2)
+        pen.stroke(handle, cup, width: lw)
+        let shape = Path(roundedRect: body, cornerRadius: r.width * 0.03)
+        pen.fill(shape, cup)
+        pen.fill(Path(rect(r, 0.42, 0.845, 0.16, 0.035)), band)
+        pen.stroke(shape, Self.ink, width: lw * 0.7)
+        // Paws round the mug.
+        for x in [0.39, 0.555] {
+            let paw = Path(ellipseIn: rect(r, x, 0.865, 0.055, 0.06))
+            pen.fill(paw, Self.rgb(1, 0.93, 0.88))
+            pen.stroke(paw, Self.ink.copy(alpha: 0.6)!, width: lw * 0.6)
+        }
+    }
 
     /// Stars circling over the head.
     private func drawDizzyStars(_ pen: Pen, _ r: CGRect) {
@@ -585,7 +628,8 @@ struct CharacterDrawing {
         switch pose {
         case .happy: .happy
         case .sleeping: .closed
-        case .working: .focused
+        case .working, .focused: .focused
+        case .resting: stretch > 0.3 ? .happy : .open(1)
         case .scared: .open(1.3)
         case .curious: .open(1.1)
         case .sad, .worried: .open(0.9)
@@ -608,6 +652,8 @@ struct CharacterDrawing {
         let g = clampedGaze
         let far = gaze == nil || (abs(g.x) > 0.95 && abs(g.y) > 0.9)
         if pose == .working && far { return CGPoint(x: 0.05 * sin(t * 0.9), y: -0.02) }
+        // Focused: mostly on the work below, a short glance towards the pointer.
+        if pose == .focused { return CGPoint(x: 0.025 * g.x, y: 0.02 + 0.015 * g.y) }
         // Sad eyes stay a little low whatever they look at.
         return CGPoint(x: 0.057 * g.x, y: 0.041 * g.y + (pose == .sad ? 0.02 : 0))
     }
@@ -636,13 +682,13 @@ struct CharacterDrawing {
         case .worried:
             p.move(to: point(r, 0.44, 0.73))
             p.addCurve(to: point(r, 0.56, 0.73), control1: point(r, 0.48, 0.7), control2: point(r, 0.52, 0.76))
-        case .working:
+        case .working, .focused:
             p.move(to: point(r, 0.46, 0.725))
             p.addLine(to: point(r, 0.54, 0.725))
         case .sleeping:
             pen.fill(Path(ellipseIn: rect(r, 0.48, 0.71, 0.04, 0.035)), Self.ink.copy(alpha: 0.8)!)
             return
-        case .idle:
+        case .idle, .resting:
             p = MelyLogo.smile(in: r)
         }
         pen.stroke(p, Self.ink, width: lw)
@@ -693,7 +739,17 @@ struct CharacterDrawing {
             }
         case .scared:
             pen.text("!", size: s * 0.26, weight: .heavy, color: Self.rgb(1.0, 0.45, 0.4), at: point(r, 0.88, 0.2))
-        case .idle:
+        case .resting:
+            // Steam curling up beside the head, against the dark.
+            for k in 0..<2 {
+                let phase = ((t / 2.6) + Double(k) * 0.5).truncatingRemainder(dividingBy: 1)
+                let x = 0.97 + 0.05 * Double(k), y = 0.62 - 0.3 * phase
+                var wisp = Path()
+                wisp.move(to: point(r, x, y + 0.1))
+                wisp.addCurve(to: point(r, x, y - 0.06), control1: point(r, x + 0.05, y + 0.05), control2: point(r, x - 0.05, y))
+                pen.stroke(wisp, Self.rgb(1, 1, 1, 0.7 * sin(phase * .pi)), width: s * 0.025)
+            }
+        case .idle, .focused:
             break
         }
     }

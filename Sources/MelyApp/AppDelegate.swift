@@ -56,17 +56,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.sessions = sessions
         let store = sessions.store
         let nowPlaying = nowPlaying
+        let focus = focus
         // Mely out of the notch (task 6.8): the same pose as in the island.
         let desktop = DesktopMelyController(presence: desktopPresence) { model in
             AnyView(WithCharacter(settings: character) {
-                LivePose(sessions: sessions, nowPlaying: nowPlaying) { DesktopMelyFace(model: model, pose: $0) }
+                LivePose(sessions: sessions, nowPlaying: nowPlaying, focus: focus) { DesktopMelyFace(model: model, pose: $0) }
             })
         }
         desktopMely = desktop
         island = IslandWindowController(
             compactLeading: { [nowPlaying, focus] in
                 WithCharacter(settings: character, desktop: desktop) {
-                    LivePose(sessions: sessions, nowPlaying: nowPlaying) { CompactLeading(music: nowPlaying.model, pose: $0, focus: focus.model) }
+                    LivePose(sessions: sessions, nowPlaying: nowPlaying, focus: focus) { CompactLeading(music: nowPlaying.model, pose: $0, focus: focus.model) }
                 }
             },
             compactTrailing: AnyView(CompactSessionStatus(store: store, usage: sessions.usage, music: nowPlaying.model)),
@@ -453,7 +454,7 @@ private struct ExpandedIsland: View {
     var body: some View {
         // Mely big on the left; in the chat it reacts to the answer. A waiting version: «Обновить» under it.
         HStack(alignment: .top, spacing: 12) {
-            LivePose(sessions: sessions, nowPlaying: nowPlaying) { pose in
+            LivePose(sessions: sessions, nowPlaying: nowPlaying, focus: focus) { pose in
                 ChatAwarePose(conversation: tabs.selected == .chat ? chat.conversation : nil,
                               fallback: reminders.celebrating ? TaskCelebration.pose(pose) : pose)
             }
@@ -663,6 +664,7 @@ private struct DesktopMelyFace: View {
 private struct LivePose<Content: View>: View {
     let sessions: ClaudeSessionsController
     let nowPlaying: NowPlayingIntegration
+    let focus: FocusIntegration
     @ViewBuilder let content: (CharacterPose) -> Content
 
     var body: some View {
@@ -673,15 +675,19 @@ private struct LivePose<Content: View>: View {
             pendingApprovals: sessions.queue.requests.filter { !$0.isQuestion }.count,
             pendingQuestions: sessions.queue.requests.filter(\.isQuestion).count,
             musicPlaying: nowPlaying.model.current?.isPlaying == true,
-            planPercent: sessions.usage.usage?.current().fullest?.usedPercent)
+            planPercent: sessions.usage.usage?.current().fullest?.usedPercent,
+            focus: focus.status == .running ? focus.model.timer.mood : nil)
         // Re-read every minute: falling asleep depends on time alone.
         TimelineView(.periodic(from: .now, by: 60)) { context in
-            content(CharacterMood.pose(inputs, now: context.date))
+            let pose = CharacterMood.pose(inputs, now: context.date)
+            // A session just over: glad for a moment.
+            content(focus.celebrating ? TaskCelebration.pose(pose) : pose)
         }
     }
 }
 
-/// A task just done: Mely is glad for a moment, unless something matters more.
+/// A task just done or a focus session over: Mely is glad for a moment, unless something
+/// matters more.
 enum TaskCelebration {
     static func pose(_ pose: CharacterPose) -> CharacterPose {
         switch pose {

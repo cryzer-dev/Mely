@@ -70,6 +70,8 @@ public struct MelyStage: View {
         case .scared: Color(red: 0.96, green: 0.31, blue: 0.37)
         case .sad: Color(red: 0.96, green: 0.62, blue: 0.04)
         case .dancing: Color(red: 0.93, green: 0.36, blue: 0.6)
+        case .focused: MelyTint.focus
+        case .resting: MelyTint.rest
         case .idle, .sleeping: Color(white: 0.7)
         }
     }

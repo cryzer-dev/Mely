@@ -279,6 +279,8 @@ struct MinimalDrawing {
         case .sad: "hourglass"
         case .dancing: "music.note"
         case .sleeping: "moon.fill"
+        case .focused: "scope"
+        case .resting: "cup.and.saucer.fill"
         }
     }
 
@@ -292,6 +294,8 @@ struct MinimalDrawing {
         case .scared: .hex("#F4505E")
         case .sad: .hex("#F59E0B")
         case .dancing: .hex("#EC5B99")
+        case .focused: .hex("#FF7A47")
+        case .resting: .hex("#4DCCC2")
         }
     }
 }
