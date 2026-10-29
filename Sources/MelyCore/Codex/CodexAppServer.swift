@@ -46,15 +46,16 @@ public enum CodexAppServer {
 
     /// One request; `codexHome` runs Codex on another config folder (a scratch copy).
     public static func request(_ method: String, params: [String: Any]? = nil, codex: URL, codexHome: URL? = nil,
-                               cwd: URL? = nil) async throws -> [String: Any] {
+                               cwd: URL? = nil, timeout: TimeInterval = timeout) async throws -> [String: Any] {
         let boxed = params.map(JSONObject.init)
         let box = try await Task.detached { () throws -> JSONObject in
-            JSONObject(try run(method, params: boxed?.value, codex: codex, codexHome: codexHome, cwd: cwd))
+            JSONObject(try run(method, params: boxed?.value, codex: codex, codexHome: codexHome, cwd: cwd, timeout: timeout))
         }.value
         return box.value
     }
 
-    private static func run(_ method: String, params: [String: Any]?, codex: URL, codexHome: URL?, cwd: URL?) throws -> [String: Any] {
+    private static func run(_ method: String, params: [String: Any]?, codex: URL, codexHome: URL?, cwd: URL?,
+                            timeout: TimeInterval) throws -> [String: Any] {
         let process = Process()
         process.executableURL = codex
         process.arguments = ["app-server"]

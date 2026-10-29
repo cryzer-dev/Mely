@@ -41,11 +41,17 @@ public struct PlanUsage: Equatable, Codable, Sendable {
     public var fiveHour: PlanWindow?
     public var sevenDay: PlanWindow?
     public var updatedAt: Date
+    /// The plan's name when the agent reports it (Codex: «plus», «pro»…).
+    public var plan: String?
+    /// Free limit resets left (Codex); nil when the agent has none.
+    public var resetCredits: Int?
 
-    public init(fiveHour: PlanWindow?, sevenDay: PlanWindow?, updatedAt: Date) {
+    public init(fiveHour: PlanWindow?, sevenDay: PlanWindow?, updatedAt: Date, plan: String? = nil, resetCredits: Int? = nil) {
         self.fiveHour = fiveHour
         self.sevenDay = sevenDay
         self.updatedAt = updatedAt
+        self.plan = plan
+        self.resetCredits = resetCredits
     }
 
     /// Nil when the payload has no window (API key sessions: `rate_limits` is null or empty).
@@ -102,7 +108,8 @@ public struct PlanUsage: Equatable, Codable, Sendable {
             guard let w, let reset = w.resetsAt, reset <= now else { return w }
             return PlanWindow(usedPercent: 0, resetsAt: nil)
         }
-        return PlanUsage(fiveHour: fresh(fiveHour), sevenDay: fresh(sevenDay), updatedAt: updatedAt)
+        return PlanUsage(fiveHour: fresh(fiveHour), sevenDay: fresh(sevenDay), updatedAt: updatedAt, plan: plan,
+                         resetCredits: resetCredits)
     }
 
     /// For the narrow compact island: "1ч 28м", "45м", "2д 4ч".
@@ -125,18 +132,32 @@ public struct PlanUsage: Equatable, Codable, Sendable {
     }
 }
 
-/// The latest plan usage, kept across launches so the overview has something to show
-/// before the first session of the day.
+/// One agent's latest plan usage, kept across launches so the overview has something to
+/// show before the first session of the day. Each agent has its own store and its own age.
 @MainActor
 @Observable
 public final class PlanUsageStore {
+    public let agent: Agent
     public private(set) var usage: PlanUsage?
+    /// Why there are no numbers, when the agent said (Codex: «войди через ChatGPT»).
+    public var problem: String?
     @ObservationIgnored private let defaults: UserDefaults
     static let defaultsKey = "planUsage"
 
-    public init(defaults: UserDefaults = .standard) {
+    /// Claude's under the key it always had: the numbers saved before agents stay Claude's.
+    static func key(_ agent: Agent) -> String { agent == .claude ? defaultsKey : "\(defaultsKey).\(agent.rawValue)" }
+
+    public init(agent: Agent = .claude, defaults: UserDefaults = .standard) {
+        self.agent = agent
         self.defaults = defaults
-        usage = defaults.data(forKey: Self.defaultsKey).flatMap { try? JSONDecoder().decode(PlanUsage.self, from: $0) }
+        usage = defaults.data(forKey: Self.key(agent)).flatMap { try? JSONDecoder().decode(PlanUsage.self, from: $0) }
+    }
+
+    /// Takes a reading asked for (Codex's app server): kept as it is.
+    public func set(_ new: PlanUsage) {
+        usage = new
+        problem = nil
+        if let data = try? JSONEncoder().encode(new) { defaults.set(data, forKey: Self.key(agent)) }
     }
 
     /// Takes a statusLine report. Reports without windows (API key) keep the last values.
@@ -146,6 +167,6 @@ public final class PlanUsageStore {
         let moved = new.fiveHour != usage?.fiveHour || new.sevenDay != usage?.sevenDay
         usage = new
         guard moved else { return }
-        if let data = try? JSONEncoder().encode(new) { defaults.set(data, forKey: Self.defaultsKey) }
+        if let data = try? JSONEncoder().encode(new) { defaults.set(data, forKey: Self.key(agent)) }
     }
 }

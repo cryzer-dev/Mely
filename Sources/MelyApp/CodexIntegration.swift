@@ -23,6 +23,13 @@ final class CodexIntegration: Integration {
     @ObservationIgnored private var changeWindow: NSWindow?
     /// The `codex` command; nil while it is not installed.
     @ObservationIgnored private(set) var codex: URL?
+    /// Codex's plan limits, asked of its app server while they are on screen.
+    let usage = PlanUsageStore(agent: .codex)
+    /// Where Codex's limits show right now; the app knows (the island, the pin).
+    @ObservationIgnored var limitsVisibility: () -> CodexUsagePoll.Visibility = { .hidden }
+    @ObservationIgnored private var pollTimer: Timer?
+    @ObservationIgnored private var lastAsked: Date?
+    @ObservationIgnored private var asking = false
 
     init(hub: AgentHookHub) {
         self.hub = hub
@@ -60,9 +67,12 @@ final class CodexIntegration: Integration {
             return
         }
         await refresh(offerInstall: true)
+        startPolling()
     }
 
     func stop() async {
+        pollTimer?.invalidate()
+        pollTimer = nil
         hub.close(for: .codex)
         changeWindow?.close()
         changeWindow = nil
@@ -91,6 +101,39 @@ final class CodexIntegration: Integration {
             } else {
                 status = .running
             }
+        }
+    }
+
+    // MARK: - Limits
+
+    /// Checks every 15 s whether the limits are due (`CodexUsagePoll`): hidden, Codex is
+    /// never started for them.
+    private func startPolling() {
+        guard pollTimer == nil else { return }
+        let t = Timer(timeInterval: 15, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.pollIfDue() }
+        }
+        t.tolerance = 5
+        RunLoop.main.add(t, forMode: .common)
+        pollTimer = t
+        pollIfDue()
+    }
+
+    /// Asks now if the limits are on screen and due; also right when they come on screen.
+    func pollIfDue() {
+        guard status != .off, !asking, let codex,
+              CodexUsagePoll.isDue(last: lastAsked, now: Date(), visibility: limitsVisibility()) else { return }
+        asking = true
+        lastAsked = Date()
+        log.info("asking codex for limits")
+        Task { [weak self] in
+            do {
+                let read = try await CodexUsage.read(codex: codex)
+                if let read { self?.usage.set(read) } else { self?.usage.problem = "Нет данных: Codex не прислал лимиты" }
+            } catch {
+                self?.usage.problem = CodexUsage.problem(for: error)
+            }
+            self?.asking = false
         }
     }
 

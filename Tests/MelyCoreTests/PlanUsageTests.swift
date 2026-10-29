@@ -161,3 +161,35 @@ import Foundation
         })
     }
 }
+
+@MainActor
+@Suite struct PlanUsageAgentsTests {
+    func defaults() throws -> UserDefaults {
+        try #require(UserDefaults(suiteName: "PlanUsageAgentsTests-\(UUID().uuidString)"))
+    }
+
+    @Test func savedBeforeAgentsIsClaudes() throws {
+        let d = try defaults()
+        let old = PlanUsage(fiveHour: PlanWindow(usedPercent: 30, resetsAt: nil), sevenDay: nil, updatedAt: Date())
+        d.set(try JSONEncoder().encode(old), forKey: "planUsage")
+        #expect(PlanUsageStore(agent: .claude, defaults: d).usage?.fiveHour?.usedPercent == 30)
+        #expect(PlanUsageStore(agent: .codex, defaults: d).usage == nil)
+    }
+
+    @Test func eachAgentKeepsItsOwnNumbersAndAge() throws {
+        let d = try defaults()
+        let claude = PlanUsageStore(agent: .claude, defaults: d), codex = PlanUsageStore(agent: .codex, defaults: d)
+        let old = Date().addingTimeInterval(-2 * 3600)
+        claude.update(rateLimits: ["five_hour": ["used_percentage": 10]], now: Date())
+        codex.set(PlanUsage(fiveHour: PlanWindow(usedPercent: 90, resetsAt: nil), sevenDay: nil, updatedAt: old, plan: "plus",
+                            resetCredits: 2))
+        #expect(claude.usage?.isStale() == false)
+        #expect(codex.usage?.isStale() == true)
+        let again = PlanUsageStore(agent: .codex, defaults: d)
+        #expect(again.usage?.fiveHour?.usedPercent == 90)
+        #expect(again.usage?.plan == "plus")
+        #expect(again.usage?.resetCredits == 2)
+        #expect(PlanUsageStore(agent: .claude, defaults: d).usage?.fiveHour?.usedPercent == 10)
+    }
+}
+
