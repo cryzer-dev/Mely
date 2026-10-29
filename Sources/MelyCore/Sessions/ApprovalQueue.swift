@@ -91,7 +91,9 @@ public final class ApprovalQueue {
         case .permissionRequest(let tool, let input, let suggestions):
             let items = suggestions["items"] as? [Any] ?? []
             kind = .approval(tool: tool, title: StepLabel.label(tool: tool, input: input.value),
-                             detail: Self.detail(tool: tool, input: input.value), canAlways: !items.isEmpty)
+                             detail: Self.detail(tool: tool, input: input.value),
+                             // Codex cannot keep a rule: «Всегда» would make it refuse.
+                             canAlways: !items.isEmpty && session.agent == .claude)
         case .question(let input):
             guard let payload = QuestionPayload(input.value) else { return nil }
             kind = .question(payload)
@@ -150,7 +152,7 @@ public final class ApprovalQueue {
 
     /// What exactly would run: the full command, or the file.
     static func detail(tool: String, input: [String: Any]) -> String? {
-        if let command = input["command"] as? String { return command }
+        if let command = StepLabel.command(input) { return command }
         if let path = input["file_path"] as? String ?? input["notebook_path"] as? String { return path }
         if let url = input["url"] as? String { return url }
         if let pattern = input["pattern"] as? String { return pattern }

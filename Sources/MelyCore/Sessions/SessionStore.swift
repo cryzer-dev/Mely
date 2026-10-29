@@ -32,6 +32,7 @@ public struct ClaudeSession: Identifiable, Equatable, Sendable {
     public let startedAt: Date
 
     public var projectName: String { origin.projectName }
+    public var agent: Agent { origin.agent }
     public var addedLines: Int { diffs.reduce(0) { $0 + $1.added } }
     public var removedLines: Int { diffs.reduce(0) { $0 + $1.removed } }
     public var lastDiff: FileDiff? { diffs.last }
@@ -106,10 +107,12 @@ public final class SessionStore {
             s.state = .working
             s.step = StepLabel.label(tool: tool, input: input.value)
         case .toolFinished(let tool, let input, let failed):
-            if !failed, var diff = StepLabel.diff(tool: tool, input: input.value) {
-                diff.id = nextDiffId
-                nextDiffId += 1
-                s.diffs.append(diff)
+            if !failed {
+                for var diff in StepLabel.diffs(tool: tool, input: input.value) {
+                    diff.id = nextDiffId
+                    nextDiffId += 1
+                    s.diffs.append(diff)
+                }
             }
             if s.state != .waitingApproval && s.state != .waitingAnswer { s.state = .working }
         case .permissionRequest(let tool, let input, _):

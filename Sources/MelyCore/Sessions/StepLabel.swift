@@ -7,7 +7,12 @@ public enum StepLabel {
         "Bash": "Запускает", "Read": "Читает", "Write": "Пишет", "Edit": "Правит", "MultiEdit": "Правит",
         "Glob": "Ищет", "Grep": "Ищет", "LS": "Смотрит", "WebSearch": "Ищет в интернете",
         "WebFetch": "Загружает", "TodoWrite": "Задачи", "Task": "Агент", "NotebookEdit": "Блокнот",
+        // Codex
+        "apply_patch": "Правит", "update_plan": "План", "spawn_agent": "Агент", "view_image": "Смотрит картинку",
+        "web_search": "Ищет в интернете",
     ]
+    /// Codex's shell tools; Claude Code's is `Bash`.
+    static let shellTools: Set<String> = ["Bash", "shell", "exec_command", "local_shell", "container.exec"]
 
     public static func label(tool: String, input: [String: Any]) -> String {
         var verb = verbs[tool] ?? tool
@@ -15,8 +20,15 @@ public enum StepLabel {
             let parts = tool.dropFirst(5).components(separatedBy: "__")
             verb = parts.count >= 2 ? "\(parts[0]) · \(parts.dropFirst().joined(separator: "__"))" : String(tool.dropFirst(5))
         }
-        if tool == "Bash", let cmd = input["command"] as? String {
+        if shellTools.contains(tool), let cmd = command(input) {
             return "\(bashVerb(cmd)) · \(oneLine(cmd))"
+        }
+        if tool == "apply_patch", let files = patchFiles(input), let first = files.first {
+            let name = URL(fileURLWithPath: first.path).lastPathComponent
+            return files.count > 1 ? "\(verb) · \(name) и ещё \(files.count - 1)" : "\(verb) · \(name)"
+        }
+        if tool == "spawn_agent", let task = (input["message"] as? String) ?? (input["task"] as? String) {
+            return "\(verb) · \(oneLine(task))"
         }
         if let file = (input["file_path"] as? String) ?? (input["path"] as? String) ?? (input["notebook_path"] as? String) {
             return "\(verb) · \(URL(fileURLWithPath: file).lastPathComponent)"
@@ -28,6 +40,37 @@ public enum StepLabel {
             return "\(verb) · \(oneLine(description))"
         }
         return verb
+    }
+
+    /// A shell command as one string: Claude Code sends a string, Codex an argv list.
+    public static func command(_ input: [String: Any]) -> String? {
+        if let s = input["command"] as? String { return s }
+        if let argv = input["command"] as? [String], !argv.isEmpty {
+            // `["bash", "-lc", "npm test"]`: the script is what ran.
+            if argv.count == 3, ["bash", "sh", "zsh"].contains(argv[0]), argv[1].hasPrefix("-") { return argv[2] }
+            return argv.joined(separator: " ")
+        }
+        if let s = input["cmd"] as? String { return s }
+        return nil
+    }
+
+    /// The files of a Codex patch (`*** Update File: path` …) with their added and removed
+    /// lines; nil when the input holds no patch.
+    static func patchFiles(_ input: [String: Any]) -> [(path: String, added: Int, removed: Int, isNew: Bool)]? {
+        let text = input.values.compactMap { $0 as? String }.first { $0.contains("*** Begin Patch") }
+            ?? (input["command"] as? [String])?.first { $0.contains("*** Begin Patch") }
+        guard let text else { return nil }
+        var files: [(path: String, added: Int, removed: Int, isNew: Bool)] = []
+        for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
+            let headers = [("*** Update File: ", false), ("*** Add File: ", true), ("*** Delete File: ", false)]
+            if let (prefix, isNew) = headers.first(where: { line.hasPrefix($0.0) }) {
+                files.append((String(line.dropFirst(prefix.count)).trimmingCharacters(in: .whitespaces), 0, 0, isNew))
+            } else if !files.isEmpty, !line.hasPrefix("***") {
+                if line.hasPrefix("+") { files[files.count - 1].added += 1 }
+                else if line.hasPrefix("-") { files[files.count - 1].removed += 1 }
+            }
+        }
+        return files.isEmpty ? nil : files
     }
 
     /// A more precise verb from a shell command's first word.
@@ -47,6 +90,17 @@ public enum StepLabel {
     public static func oneLine(_ text: String, limit: Int = 60) -> String {
         let collapsed = text.split(whereSeparator: { $0.isNewline || $0 == "\t" }).joined(separator: " ")
         return collapsed.count > limit ? String(collapsed.prefix(limit)) + "…" : collapsed
+    }
+
+    /// The diffs of an editing tool call: one per file (a Codex patch can touch several).
+    public static func diffs(tool: String, input: [String: Any]) -> [FileDiff] {
+        if tool == "apply_patch" {
+            // Counts only: the patch has no full lines around the change.
+            return (patchFiles(input) ?? []).filter { $0.added > 0 || $0.removed > 0 }.map {
+                FileDiff(path: $0.path, added: $0.added, removed: $0.removed, hunks: [], tooLarge: false, isNewFile: $0.isNew)
+            }
+        }
+        return diff(tool: tool, input: input).map { [$0] } ?? []
     }
 
     /// The live diff of an editing tool call, or nil when it changes nothing.

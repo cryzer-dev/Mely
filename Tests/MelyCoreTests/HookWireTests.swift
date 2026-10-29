@@ -34,6 +34,19 @@ private func json(_ s: String?) -> [String: Any] {
         #expect((decision?["updatedPermissions"] as? [[String: Any]])?.count == 1)
     }
 
+    @Test func codexGetsNoAlways() {
+        // Codex refuses a decision with `updatedPermissions`: «Всегда» answers as a plain allow.
+        let payload: [String: Any] = ["permission_suggestions": [["type": "addRules"]], HookWire.agentKey: "codex"]
+        let out = json(HookDecision.always.hookOutput(event: "PermissionRequest", payload: payload))
+        let decision = (out["hookSpecificOutput"] as? [String: Any])?["decision"] as? [String: Any]
+        #expect(decision?["behavior"] as? String == "allow")
+        #expect(decision?["updatedPermissions"] == nil)
+        #expect(Set(decision?.keys ?? [:].keys) == ["behavior"])
+        let deny = json(HookDecision.deny.hookOutput(event: "PermissionRequest", payload: payload))
+        let denied = (deny["hookSpecificOutput"] as? [String: Any])?["decision"] as? [String: Any]
+        #expect(Set(denied?.keys ?? [:].keys) == ["behavior", "message"])
+    }
+
     @Test func askPrintsNothing() {
         #expect(HookDecision.ask.hookOutput(event: "PermissionRequest", payload: [:]) == nil)
         #expect(HookDecision.allow.hookOutput(event: "PreToolUse", payload: [:]) == nil)

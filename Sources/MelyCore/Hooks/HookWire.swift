@@ -8,6 +8,8 @@ public enum HookWire {
     public static let kindKey = "mely_kind"
     public static let kindStatusLine = "statusline"
     public static let kindAskUserQuestion = "ask_user_question"
+    /// Which agent sent the event (`nc-hook --agent codex`); absent for Claude Code.
+    public static let agentKey = "mely_agent"
 
     /// Fire-and-forget events: connect + send must finish in this time or we give up.
     public static let fireAndForgetTimeout: TimeInterval = 0.3
@@ -93,9 +95,12 @@ public enum HookDecision: Equatable, Sendable {
             // Allow/deny only make sense for a permission request.
             guard event == "PermissionRequest" else { return nil }
             var decision: [String: Any]
+            // Codex refuses a decision with `updatedPermissions` ("fail closed"): no «Всегда» there.
+            let canPersist = Agent(wire: payload[HookWire.agentKey] as? String) == .claude
             switch self {
             case .deny: decision = ["behavior": "deny", "message": "Отклонено в Mely"]
-            case .always: decision = ["behavior": "allow", "updatedPermissions": payload["permission_suggestions"] ?? []]
+            case .always where canPersist:
+                decision = ["behavior": "allow", "updatedPermissions": payload["permission_suggestions"] ?? []]
             default: decision = ["behavior": "allow"]
             }
             output = ["hookSpecificOutput": ["hookEventName": "PermissionRequest", "decision": decision]]

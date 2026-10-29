@@ -49,6 +49,20 @@ private final class Pipe {
          "options": [["label": "корзину"], ["label": "оплату"], ["label": "доставку"]]],
     ]]
 
+    @Test func codexRequestHasNoAlwaysAndGoesWhenTheHookGivesUp() {
+        let queue = ApprovalQueue()
+        let pipe = Pipe()
+        let codex = store.apply(.sessionStart, origin: HookOrigin(["session_id": "c", "cwd": "/w/api", HookWire.agentKey: "codex"]))!
+        let request = queue.enqueue(bash("npm test", suggestions: [["type": "addRules"]]), session: codex, responder: pipe.responder)
+        guard case .approval(_, _, _, let canAlways)? = request?.kind else { Issue.record("no card"); return }
+        #expect(!canAlways)
+        #expect(request?.sessionId == "codex:c")
+        // 120 s later Codex stops waiting and `nc-hook` hangs up: the card goes, Codex asks in the terminal.
+        pipe.hangUp()
+        #expect(queue.sweep().map(\.id) == [request?.id])
+        #expect(queue.requests.isEmpty)
+    }
+
     @Test func requestsFromTwoSessionsQueueInOrder() {
         let queue = ApprovalQueue()
         let a = Pipe(), b = Pipe()

@@ -1,7 +1,10 @@
 import Foundation
 
-/// Where a Claude Code session runs, as reported by `nc-hook`.
+/// Where an agent's session runs, as reported by `nc-hook`.
 public struct HookOrigin: Equatable, Sendable {
+    public var agent: Agent
+    /// The store's id: the agent's own session id, prefixed for agents other than Claude
+    /// (`Agent.sessionKey`).
     public var sessionId: String
     public var cwd: String
     public var termProgram: String
@@ -23,7 +26,8 @@ public struct HookOrigin: Equatable, Sendable {
 
     public init(_ p: [String: Any]) {
         func s(_ k: String) -> String { p[k] as? String ?? "" }
-        sessionId = s("session_id").isEmpty ? "unknown" : s("session_id")
+        agent = Agent(wire: p[HookWire.agentKey] as? String)
+        sessionId = agent.sessionKey(s("session_id").isEmpty ? "unknown" : s("session_id"))
         cwd = s("cwd")
         termProgram = s(HookContext.termProgram)
         terminalEmulator = s(HookContext.terminalEmulator)

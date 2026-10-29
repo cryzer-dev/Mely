@@ -8,6 +8,7 @@ import MelyCore
 //   nc-hook --ask           PreToolUse hook for AskUserQuestion (waits for an answer)
 //   nc-hook --statusline    statusLine command: forwards rate limits, then runs the
 //                           user's previous statusLine command and prints its output
+//   nc-hook --agent codex   the same for Codex CLI's hooks (`~/.codex/hooks.json`)
 //
 // Rule: never get in Claude Code's way. Whatever fails, exit 0; print nothing unless
 // the app gave an explicit decision.
@@ -66,6 +67,11 @@ if args.contains("--statusline") {
 }
 
 guard !payload.isEmpty else { exit(0) }
+
+// Which agent runs this hook: the app keeps each agent's sessions apart.
+if let i = args.firstIndex(of: "--agent"), i + 1 < args.count {
+    payload[HookWire.agentKey] = args[i + 1]
+}
 
 HookContext.enrich(&payload, env: ProcessInfo.processInfo.environment,
                    hostApp: ProcessTree.hostAppBundleId(),
