@@ -111,6 +111,7 @@ enum Snapshots {
             Snapshot(name: "Settings_Updates", view: AnyView(updateSettings())),
             Snapshot(name: "Settings_Tasks", view: AnyView(tasksSettings())),
             Snapshot(name: "Settings_Focus", view: AnyView(focusSettings())),
+            Snapshot(name: "Settings_Agents", view: AnyView(agentsSettings())),
             Snapshot(name: "Notifications_Tab", view: AnyView(messagesTab())),
             Snapshot(name: "PlanUsageGauge", view: AnyView(planUsage())),
             Snapshot(name: "Sessions_StaleUsage", view: AnyView(expandedApp(.sessions, pose: .working) {
@@ -325,6 +326,17 @@ enum Snapshots {
                 .environment(\.colorScheme, scheme)
         }
         return HStack(alignment: .top, spacing: 0) { column(plain, .light); column(changed, .dark) }
+    }
+
+    /// Settings → Интеграции: Claude Code and Codex in their own section on top; light and dark.
+    @MainActor private static func agentsSettings() -> some View {
+        func column(_ scheme: ColorScheme) -> some View {
+            IntegrationsSettingsView(registry: sampleRegistry(), openPermission: { _ in })
+                .frame(width: 560, height: 640)
+                .background(scheme == .dark ? Color(white: 0.12) : Color(white: 0.93))
+                .environment(\.colorScheme, scheme)
+        }
+        return HStack(spacing: 0) { column(.light); column(.dark) }
     }
 
     @MainActor private static func tasksSettings() -> some View {

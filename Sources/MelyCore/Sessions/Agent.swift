@@ -21,6 +21,19 @@ public enum Agent: String, CaseIterable, Codable, Sendable {
         }
     }
 
+    /// Its integration in the registry: on there, it is on in the notch.
+    public var integrationId: String {
+        switch self {
+        case .claude: "claude-code"
+        case .codex: "codex"
+        }
+    }
+
+    public init?(integrationId: String) {
+        guard let agent = Agent.allCases.first(where: { $0.integrationId == integrationId }) else { return nil }
+        self = agent
+    }
+
     /// What `nc-hook --agent <name>` puts in `HookWire.agentKey`; none means Claude Code
     /// (its hooks were installed before there was a choice).
     public init(wire: String?) {

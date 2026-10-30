@@ -203,56 +203,84 @@ public struct SessionRow: View {
     }
 }
 
-/// Expanded island: every live session.
+/// Expanded island: every live session. With several agents on, one agent's at a time,
+/// chosen in the switcher on top.
 public struct SessionsOverview: View {
     let store: SessionStore
     let usage: PlanUsageStore?
+    let agents: AgentsModel?
+    /// The waiting requests: a dot on an agent not shown.
+    let requests: [PendingRequest]
     /// Off when the island's tab bar already shows the title and the gauge.
     let showsHeader: Bool
     let open: (ClaudeSession) -> Void
 
-    public init(store: SessionStore, usage: PlanUsageStore? = nil, showsHeader: Bool = true,
+    public init(store: SessionStore, usage: PlanUsageStore? = nil, agents: AgentsModel? = nil,
+                requests: [PendingRequest] = [], showsHeader: Bool = true,
                 open: @escaping (ClaudeSession) -> Void) {
         self.store = store
         self.usage = usage
+        self.agents = agents
+        self.requests = requests
         self.showsHeader = showsHeader
         self.open = open
     }
 
+    /// The agent shown, when several are on.
+    private var agent: Agent? { agents?.isMulti == true ? agents?.tabAgent : nil }
+
+    private var sessions: [ClaudeSession] {
+        guard let agent else { return store.sessions }
+        return store.sessions.filter { $0.agent == agent }
+    }
+
+    /// The tab's agent's limits; with one agent, that agent's.
+    private var shownUsage: PlanUsageStore? {
+        guard let agents else { return usage }
+        return agents.usage(agents.tabAgent)
+    }
+
     public var body: some View {
+        let sessions = sessions
         VStack(alignment: .leading, spacing: 8) {
             if showsHeader {
                 HStack {
-                    Text("Claude Code").font(.system(size: MelyType.body, weight: .semibold)).foregroundStyle(.white.opacity(MelyInk.secondary))
+                    Text((agents?.tabAgent ?? .claude).title).font(.system(size: MelyType.body, weight: .semibold)).foregroundStyle(.white.opacity(MelyInk.secondary))
                     Spacer(minLength: 8)
-                    if let usage { PlanUsageGauge(usage: usage.usage) }
+                    if let usage = shownUsage { PlanUsageGauge(usage: usage.usage) }
                 }
             }
-            if store.sessions.isEmpty {
-                Text("Нет активных сессий").font(.system(size: MelyType.title)).foregroundStyle(.white.opacity(MelyInk.secondary))
+            if let agents, agents.isMulti {
+                AgentSwitcher(agents: agents, sessions: store.sessions, requests: requests)
+                    .islandPart(spacing: 8)
+            }
+            if sessions.isEmpty {
+                Text(agent.map { "Нет активных сессий \($0.title)" } ?? "Нет активных сессий")
+                    .font(.system(size: MelyType.title)).foregroundStyle(.white.opacity(MelyInk.secondary))
+                    .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .center).padding(.vertical, 20)
                     .layoutProbe("sessions.empty", inside: "content")
                     .islandPart()
             } else {
                 ScrollView {
                     VStack(spacing: 6) {
-                        ForEach(store.sessions) { session in
+                        ForEach(sessions) { session in
                             SessionRow(session: session) { open(session) }
                         }
                     }
                     .background(GeometryReader { geo in
                         Color.clear.preference(key: IslandPartHeightKey.self,
-                                               value: Self.listHeight(rows: geo.size.height, count: store.sessions.count))
+                                               value: Self.listHeight(rows: geo.size.height, count: sessions.count))
                     })
                 }
                 .layoutProbe("sessions.list", inside: "content", scrolls: true)
             }
             // The header only has room for a ring: here, which limit, how much and when.
-            if !showsHeader, let usage {
+            if !showsHeader, let usage = shownUsage {
                 Spacer(minLength: 0)
                 HStack(spacing: 8) {
                     Text("Лимиты").font(.system(size: MelyType.footnote, weight: .medium)).foregroundStyle(.white.opacity(MelyInk.tertiary))
-                    PlanUsageGauge(usage: usage.usage)
+                    PlanUsageGauge(usage: usage.usage, problem: usage.problem)
                     Spacer(minLength: 0)
                 }
                 .padding(.horizontal, 10).padding(.vertical, 7)
@@ -281,20 +309,25 @@ extension SessionsOverview {
 /// Right side of the compact island: the session that matters most.
 public struct CompactSessionStatus: View {
     let store: SessionStore
-    let usage: PlanUsageStore?
+    let fixedUsage: PlanUsageStore?
+    let agents: AgentsModel?
     let music: NowPlayingModel?
 
-    public init(store: SessionStore, usage: PlanUsageStore? = nil, music: NowPlayingModel? = nil) {
+    public init(store: SessionStore, usage: PlanUsageStore? = nil, agents: AgentsModel? = nil, music: NowPlayingModel? = nil) {
         self.store = store
-        self.usage = usage
+        self.fixedUsage = usage
+        self.agents = agents
         self.music = music
     }
+
+    /// The pinned agent's limits (the first one on, unless pinned).
+    private var usage: PlanUsageStore? { agents?.shownUsage ?? fixedUsage }
 
     public var body: some View {
         HStack(spacing: 6) {
             sessionStatus
             if music?.current?.isPlaying == true { EqualizerBars().frame(width: 11, height: 11) }
-            CompactPlanGauge(usage: usage?.usage)
+            CompactPlanGauge(usage: usage?.usage, agent: agents?.shownAgent ?? .claude, marked: agents?.isMulti == true)
         }
     }
 

@@ -23,7 +23,9 @@ public struct IslandHeader: View {
 
     let tabs: IslandTabs
     let items: [Item]
-    let usage: PlanUsageStore?
+    let fixedUsage: PlanUsageStore?
+    /// The agents on: whose limits the ring shows, and the card with a block each.
+    let agents: AgentsModel?
     let soundOn: Bool
     /// A request waits: the island cannot fold, so no «×».
     let heldOpen: Bool
@@ -36,13 +38,14 @@ public struct IslandHeader: View {
     /// The limits card under the pill.
     @State private var showsUsage = false
 
-    public init(tabs: IslandTabs, items: [Item], usage: PlanUsageStore?, soundOn: Bool, heldOpen: Bool,
+    public init(tabs: IslandTabs, items: [Item], usage: PlanUsageStore?, agents: AgentsModel? = nil, soundOn: Bool, heldOpen: Bool,
                 updateAvailable: Bool = false, showsUsage: Bool = false,
                 toggleSound: @escaping () -> Void, openSettings: @escaping () -> Void, close: @escaping () -> Void) {
         _showsUsage = State(initialValue: showsUsage)
         self.tabs = tabs
         self.items = items
-        self.usage = usage
+        self.fixedUsage = usage
+        self.agents = agents
         self.soundOn = soundOn
         self.heldOpen = heldOpen
         self.updateAvailable = updateAvailable
@@ -50,6 +53,11 @@ public struct IslandHeader: View {
         self.openSettings = openSettings
         self.close = close
     }
+
+    /// The pinned agent's limits (the first one on, unless pinned).
+    private var usage: PlanUsageStore? { agents?.shownUsage ?? fixedUsage }
+    private var agent: Agent { agents?.shownAgent ?? .claude }
+    private var isMulti: Bool { agents?.isMulti == true }
 
     public var body: some View {
         HStack(spacing: 0) {
@@ -69,24 +77,33 @@ public struct IslandHeader: View {
             HStack(spacing: 4) {
                 if let usage {
                     Button { showsUsage.toggle() } label: {
-                        CompactPlanGauge(usage: usage.usage, showsEmpty: true)
+                        CompactPlanGauge(usage: usage.usage, showsEmpty: true, agent: agent, marked: isMulti)
                             .padding(.horizontal, 7).frame(height: 22)
                             .background(.white.opacity(showsUsage ? 0.16 : 0.07), in: Capsule())
                             .contentShape(Capsule())
                             .layoutProbe("header.usage", row: "header", inside: "island", contains: "plan.gauge")
                     }
                     .buttonStyle(.plain)
-                    .help("Лимиты Claude: какой, сколько и когда сброс")
+                    .help(isMulti ? "Лимиты агентов: чей в челке, сколько и когда сброс"
+                                  : "Лимиты \(agent.shortName): какой, сколько и когда сброс")
                     .overlay(alignment: .topTrailing) {
                         if showsUsage {
-                            PlanUsageCard(usage: usage.usage)
-                                .offset(y: 28)
-                                .layoutProbe("plan.card", inside: "island")
-                                .onTapGesture { showsUsage = false }
-                                .transition(.opacity.combined(with: .offset(y: -4)))
+                            Group {
+                                if let agents, isMulti {
+                                    // A click on a block pins it; the card stays to show the change.
+                                    AgentsUsageCard(agents: agents)
+                                } else {
+                                    PlanUsageCard(usage: usage.usage, agent: agent, problem: usage.problem)
+                                        .onTapGesture { showsUsage = false }
+                                }
+                            }
+                            .offset(y: 28)
+                            .layoutProbe("plan.card", inside: "island")
+                            .transition(.opacity.combined(with: .offset(y: -4)))
                         }
                     }
                     .animation(.easeOut(duration: 0.15), value: showsUsage)
+                    .onChange(of: showsUsage, initial: true) { agents?.cardOpen = showsUsage }
                     .padding(.trailing, 4)
                 }
                 HeaderIcon(icon: soundOn ? "speaker.wave.2.fill" : "speaker.slash.fill",

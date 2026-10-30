@@ -11,10 +11,13 @@ public struct RequestCard: View {
     let answerInTerminal: () -> Void
     /// Snapshots: a question's list scrolled to its end.
     let scrolledToEnd: Bool
+    /// Several agents on: the card says whose («Codex спрашивает»).
+    let namesAgent: Bool
 
-    public init(request: PendingRequest, position: Int, total: Int, scrolledToEnd: Bool = false,
+    public init(request: PendingRequest, position: Int, total: Int, scrolledToEnd: Bool = false, namesAgent: Bool = false,
                 decide: @escaping (HookDecision) -> Void, answerInTerminal: @escaping () -> Void) {
         self.request = request
+        self.namesAgent = namesAgent
         self.scrolledToEnd = scrolledToEnd
         self.position = position
         self.total = total
@@ -25,8 +28,14 @@ public struct RequestCard: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
-                Circle().fill(SessionStateStyle.color(request.isQuestion ? .waitingAnswer : .waitingApproval)).frame(width: 7, height: 7)
-                Text(request.isQuestion ? "Вопрос" : "Разрешение").font(.system(size: MelyType.body, weight: .semibold))
+                if namesAgent {
+                    AgentDot(agent: request.agent)
+                    Text("\(request.agent.shortName) спрашивает").font(.system(size: MelyType.body, weight: .semibold))
+                        .lineLimit(1).fixedSize()
+                } else {
+                    Circle().fill(SessionStateStyle.color(request.isQuestion ? .waitingAnswer : .waitingApproval)).frame(width: 7, height: 7)
+                    Text(request.isQuestion ? "Вопрос" : "Разрешение").font(.system(size: MelyType.body, weight: .semibold))
+                }
                 Text("\(request.projectName) · \(request.hostName)")
                     .font(.system(size: MelyType.footnote)).foregroundStyle(.white.opacity(MelyInk.secondary)).lineLimit(1)
                 Spacer(minLength: 6)
@@ -284,6 +293,8 @@ public struct ClaudeOverview: View {
     let store: SessionStore
     let queue: ApprovalQueue
     let usage: PlanUsageStore?
+    /// The agents on: the switcher, the labels on the cards.
+    let agents: AgentsModel?
     let tabs: IslandTabs?
     let chat: AnyView?
     /// The "Уведомления" tab.
@@ -302,7 +313,7 @@ public struct ClaudeOverview: View {
     /// What each page measured itself at (`islandPart`).
     @State private var heights: [IslandTabs.Tab: CGFloat] = [:]
 
-    public init(store: SessionStore, queue: ApprovalQueue, usage: PlanUsageStore? = nil,
+    public init(store: SessionStore, queue: ApprovalQueue, usage: PlanUsageStore? = nil, agents: AgentsModel? = nil,
                 tabs: IslandTabs? = nil, chat: AnyView? = nil, notifications: AnyView? = nil,
                 today: AnyView? = nil, tasks: AnyView? = nil, music: AnyView? = nil, whatsNew: AnyView? = nil,
                 open: @escaping (ClaudeSession) -> Void,
@@ -311,6 +322,7 @@ public struct ClaudeOverview: View {
         self.store = store
         self.queue = queue
         self.usage = usage
+        self.agents = agents
         self.tabs = tabs
         self.chat = chat
         self.notifications = notifications
@@ -326,7 +338,7 @@ public struct ClaudeOverview: View {
     public var body: some View {
         Group {
             if let request = queue.current {
-                RequestCard(request: request, position: 1, total: queue.requests.count,
+                RequestCard(request: request, position: 1, total: queue.requests.count, namesAgent: agents?.isMulti == true,
                             decide: { decide(request, $0) }, answerInTerminal: { answerInTerminal(request) })
                     .transition(.opacity)
             } else if let whatsNew {
@@ -347,7 +359,8 @@ public struct ClaudeOverview: View {
                     } else if tabs.selected == .music, let music {
                         music
                     } else {
-                        SessionsOverview(store: store, usage: usage, showsHeader: false, open: open)
+                        SessionsOverview(store: store, usage: usage, agents: agents, requests: queue.requests,
+                                         showsHeader: false, open: open)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -360,7 +373,7 @@ public struct ClaudeOverview: View {
                 .id(tabs.selected)
                 .transition(.asymmetric(insertion: .opacity.combined(with: .offset(y: 6)), removal: .opacity))
             } else {
-                SessionsOverview(store: store, usage: usage, open: open)
+                SessionsOverview(store: store, usage: usage, agents: agents, requests: queue.requests, open: open)
                     .transition(.opacity)
             }
         }

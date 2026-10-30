@@ -15,6 +15,8 @@ final class ClaudeSessionsController {
     private let reveal: () -> Void
     private let expand: () -> Void
     private let peek: (PeekContent) -> Void
+    /// An agent's request came or its turn ended (the island may open for it).
+    var agentEvent: ((Agent) -> Void)?
     private var settleTasks: [String: Task<Void, Never>] = [:]
     private var sweepTimer: Timer?
     private lazy var watcher = SessionWatcher { [weak self] id in self?.processEnded(id) }
@@ -45,8 +47,9 @@ final class ClaudeSessionsController {
         let session = store.apply(event, origin: origin)
         if let responder {
             if let session, let request = queue.enqueue(event, session: session, responder: responder) {
+                agentEvent?(session.agent)
                 island.post(IslandItem(id: Self.itemId(request), kind: request.isQuestion ? .question : .approval,
-                                       source: "claude-code", title: request.projectName))
+                                       source: session.agent.integrationId, title: request.projectName))
                 startSweeping()
                 SoundEngine.shared.play(request.isQuestion ? .question : .approval)
                 expand()
@@ -68,13 +71,16 @@ final class ClaudeSessionsController {
         let itemId = "session-\(session.id)"
         switch session.state {
         case .thinking, .working:
-            island.post(IslandItem(id: itemId, kind: .agentActivity, source: "claude-code",
+            island.post(IslandItem(id: itemId, kind: .agentActivity, source: session.agent.integrationId,
                                    title: session.projectName, subtitle: session.step))
             // A new turn shows for a moment; its every tool step does not.
             if IslandWings.startsTurn(from: before, to: session.state) { reveal() }
         case .finished(let summary):
             island.remove(id: itemId)
-            if before != session.state { SoundEngine.shared.play(.finish) }
+            if before != session.state {
+                SoundEngine.shared.play(.finish)
+                agentEvent?(session.agent)
+            }
             peek(PeekContent(id: itemId, symbol: "checkmark", tint: .green,
                              title: "Готово · \(session.projectName)",
                              subtitle: summary.isEmpty ? session.host.name : summary,
@@ -94,7 +100,7 @@ final class ClaudeSessionsController {
             island.remove(id: itemId)
             if before != session.state { SoundEngine.shared.play(.limit) }
             peek(PeekContent(id: itemId, symbol: "hourglass", tint: .yellow,
-                             title: "Лимит Claude · \(session.projectName)", subtitle: "Сессия упёрлась в лимит плана"))
+                             title: "Лимит \(session.agent.shortName) · \(session.projectName)", subtitle: "Сессия упёрлась в лимит плана"))
         default:
             island.remove(id: itemId)
         }

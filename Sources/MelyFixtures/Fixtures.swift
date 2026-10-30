@@ -28,7 +28,7 @@ public enum Fixtures {
     /// Mely left, the section right (tasks 7.9, 7.10).
     public static func expandedApp<C: View>(_ tab: IslandTabs.Tab, geometry: IslandScreenGeometry? = nil,
                                             held: Bool = false, showsUsage: Bool = false, pose: CharacterPose = .idle,
-                                            usage: PlanUsageStore? = nil, updateAvailable: Bool = false,
+                                            usage: PlanUsageStore? = nil, agents: AgentsModel? = nil, updateAvailable: Bool = false,
                                             focus: FocusTimer? = nil, backdrop: Color = Color(white: 0.85),
                                             @ViewBuilder content: () -> C) -> some View {
         let p = IslandPresentation(geometry: geometry ?? macBook14.geometry)
@@ -45,34 +45,35 @@ public enum Fixtures {
                                   }
                               },
                               header: { header(selected: tab, held: held, showsUsage: showsUsage,
-                                               updateAvailable: updateAvailable, usage: usage ?? self.usage(.header)) })
+                                               updateAvailable: updateAvailable, usage: usage ?? self.usage(.header), agents: agents) })
             .background(backdrop)
     }
 
     /// The expanded island's header, as the app builds it (task 7.9).
     public static func header(selected: IslandTabs.Tab, held: Bool = false, showsUsage: Bool = false,
-                              updateAvailable: Bool = false, usage: PlanUsageStore? = nil) -> IslandHeader {
+                              updateAvailable: Bool = false, usage: PlanUsageStore? = nil, agents: AgentsModel? = nil) -> IslandHeader {
         let tabs = IslandTabs()
         tabs.selected = selected
         return IslandHeader(tabs: tabs, items: [
-            .init(.sessions, icon: "house.fill", title: "Claude Code"),
+            .init(.sessions, icon: "house.fill", title: "Агенты"),
             .init(.chat, icon: "bubble.left.fill", title: "Чат"),
             .init(.today, icon: "calendar", title: "Сегодня"),
             .init(.tasks, icon: "checklist", title: "Задачи"),
             .init(.music, icon: "music.note", title: "Музыка"),
             .init(.notifications, icon: "bell.fill", title: "Уведомления", badge: 3),
-        ], usage: usage ?? self.usage(.header), soundOn: true, heldOpen: held, updateAvailable: updateAvailable,
+        ], usage: usage ?? self.usage(.header), agents: agents, soundOn: true, heldOpen: held, updateAvailable: updateAvailable,
            showsUsage: showsUsage, toggleSound: {}, openSettings: {}, close: {})
     }
 
     /// The compact island: Mely (and a cover) left, the status right.
     public static func compact(_ geometry: IslandScreenGeometry, store: SessionStore, usage: PlanUsageStore?,
+                               agents: AgentsModel? = nil,
                                music: NowPlayingModel?, focus: FocusTimer? = nil, pose: CharacterPose = .idle,
                                backdrop: Color = Color(white: 0.85)) -> some View {
         let p = IslandPresentation(geometry: geometry)
         p.mode = .compact
         return IslandRootView(presentation: p, compactLeading: { CompactLeading(music: music ?? NowPlayingModel(), pose: pose, focus: focus.map { FocusModel(timer: $0) }) },
-                              compactTrailing: AnyView(CompactSessionStatus(store: store, usage: usage, music: music)),
+                              compactTrailing: AnyView(CompactSessionStatus(store: store, usage: usage, agents: agents, music: music)),
                               expanded: { EmptyView() })
             .background(backdrop)
     }
@@ -192,6 +193,61 @@ public enum Fixtures {
         HookOrigin(["session_id": id, "cwd": cwd, "host_bundle_id": host])
     }
 
+    /// A Codex CLI session in Terminal.
+    public static func codexOrigin(_ id: String, _ cwd: String) -> HookOrigin {
+        HookOrigin(["session_id": id, "cwd": cwd, "host_bundle_id": "com.apple.Terminal", HookWire.agentKey: "codex"])
+    }
+
+    // MARK: Agents
+
+    /// Claude Code and Codex as the app has them: which are on, the pin, the tab's choice.
+    public static func agents(_ enabled: [Agent] = [.claude, .codex], pinned: Agent? = nil, selected: Agent? = nil,
+                              claude: Usage = .normal, codex: Bool = true) -> AgentsModel {
+        let suite = "mely-fixtures-agents"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let model = AgentsModel(usage: [.claude: usage(claude), .codex: codexUsage(codex)], defaults: defaults) { enabled.contains($0) }
+        model.pinned = pinned
+        model.selected = selected
+        return model
+    }
+
+    /// Codex's limits as its app server reports them, or none (signed out).
+    public static func codexUsage(_ hasData: Bool = true) -> PlanUsageStore {
+        let suite = "mely-fixtures-usage-codex"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let store = PlanUsageStore(agent: .codex, defaults: defaults)
+        if hasData {
+            let now = Date()
+            store.set(PlanUsage(fiveHour: PlanWindow(usedPercent: 23, resetsAt: now.addingTimeInterval(3 * 3600 + 20 * 60)),
+                                sevenDay: PlanWindow(usedPercent: 61, resetsAt: now.addingTimeInterval(4 * 86400)),
+                                updatedAt: now, plan: "plus", resetCredits: 1))
+        } else {
+            store.problem = "Нет данных: войди в Codex через ChatGPT"
+        }
+        return store
+    }
+
+    /// Two Claude Code sessions and one of Codex; Codex's asks with `codexWaits`.
+    public static func agentSessions(claude: Int = 2, codex: Int = 1) -> SessionStore {
+        let store = sessions(claude)
+        for name in ["api", "infra"].prefix(codex) {
+            store.apply(.toolStarted(tool: "apply_patch", input: JSONObject(["input": "*** Begin Patch\n*** Update File: src/\(name).rs\n"])),
+                        origin: codexOrigin("x-\(name)", "/w/\(name)"))
+        }
+        return store
+    }
+
+    /// A Codex session waiting for an approval, in `store`.
+    public static func codexWaits(_ store: SessionStore) -> ApprovalQueue {
+        let queue = ApprovalQueue()
+        let event: HookEvent = .permissionRequest(tool: "shell", input: JSONObject(["command": ["bash", "-lc", "cargo test"]]),
+                                                  suggestions: JSONObject([:]))
+        queue.enqueue(event, session: store.apply(event, origin: codexOrigin("x-api", "/w/api"))!, responder: SampleResponder.make())
+        return queue
+    }
+
     /// `count` sessions working on files.
     public static func sessions(_ count: Int) -> SessionStore {
         let store = SessionStore()
@@ -235,7 +291,8 @@ public enum Fixtures {
         return store
     }
 
-    public static func sessionsPage(_ store: SessionStore, usage: PlanUsageStore? = nil, expanded: String? = nil) -> some View {
+    public static func sessionsPage(_ store: SessionStore, usage: PlanUsageStore? = nil, agents: AgentsModel? = nil,
+                                    queue: ApprovalQueue = ApprovalQueue(), expanded: String? = nil) -> some View {
         Group {
             if let expanded, let session = store.session(expanded) {
                 // An unfolded answer: the row as the list shows it, opened.
@@ -246,17 +303,18 @@ public enum Fixtures {
                 .layoutProbe("sessions.list", inside: "content", scrolls: true)
                 .frame(maxHeight: .infinity, alignment: .top)
             } else {
-                ClaudeOverview(store: store, queue: ApprovalQueue(), usage: usage, tabs: IslandTabs(),
+                ClaudeOverview(store: store, queue: queue, usage: usage, agents: agents, tabs: IslandTabs(),
                                open: { _ in }, decide: { _, _ in }, answerInTerminal: { _ in })
             }
         }
     }
 
     /// A WebStorm session asking, with a second request queued behind it.
-    public static func requestPage(question: Bool, scrolledToEnd: Bool = false) -> some View {
+    public static func requestPage(question: Bool, scrolledToEnd: Bool = false, agent: Agent = .claude,
+                                   agents: AgentsModel? = nil) -> some View {
         let store = SessionStore()
         let queue = ApprovalQueue()
-        let ws = origin("a", "/w/shop")
+        let ws = agent == .codex ? codexOrigin("a", "/w/shop") : origin("a", "/w/shop")
         let event: HookEvent = question
             ? .question(input: JSONObject(["questions": [
                 ["question": "Какую библиотеку валидации взять?", "header": "Библиотека", "multiSelect": false,
@@ -278,7 +336,7 @@ public enum Fixtures {
                 RequestCard(request: current, position: 1, total: queue.requests.count, scrolledToEnd: true,
                             decide: { _ in }, answerInTerminal: {})
             } else {
-                ClaudeOverview(store: store, queue: queue, open: { _ in }, decide: { _, _ in }, answerInTerminal: { _ in })
+                ClaudeOverview(store: store, queue: queue, agents: agents, open: { _ in }, decide: { _, _ in }, answerInTerminal: { _ in })
             }
         }
     }

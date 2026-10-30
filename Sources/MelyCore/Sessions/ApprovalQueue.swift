@@ -49,6 +49,8 @@ public struct PendingRequest: Identifiable, Equatable, Sendable {
 
     public let id: Int
     public let sessionId: String
+    /// Whose session asks: the card names it when several agents are on.
+    public let agent: Agent
     public let projectName: String
     public let hostName: String
     public let kind: Kind
@@ -106,7 +108,7 @@ public final class ApprovalQueue {
             responders[old.id] = responder
             return old
         }
-        let request = PendingRequest(id: nextId, sessionId: session.id, projectName: session.projectName,
+        let request = PendingRequest(id: nextId, sessionId: session.id, agent: session.agent, projectName: session.projectName,
                                      hostName: session.host.name, kind: kind, createdAt: now)
         nextId += 1
         requests.append(request)

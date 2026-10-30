@@ -27,6 +27,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var inbox = NotificationInbox(fileURL: inboxSettings.persists ? NotificationInbox.defaultURL : nil)
     private var chatHotKey: GlobalHotKey?
     private var sessions: ClaudeSessionsController?
+    /// The agents on: the «Агенты» tab's switcher, whose limits the ring shows.
+    private var agents: AgentsModel?
     private let characterSettings = CharacterSettings()
     private let desktopPresence = DesktopPresence()
     private var desktopMely: DesktopMelyController?
@@ -38,6 +40,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                                          updates: updateState, peeks: nowPlaying.peeks, inbox: inboxSettings,
                                                          telemetry: telemetry.settings,
                                                          displayChanged: { [weak self] in self?.island?.relocateToChosenScreen() })
+
+    /// An agent's request or finished turn: the island opening for it shows that agent's
+    /// sessions. An island already open stays on what the user looks at.
+    private func eventOpens(_ agent: Agent) {
+        guard let agents, agents.isMulti, island?.presentation.mode != .expanded else { return }
+        agents.selected = agent
+    }
+
+    /// Where Codex's limits are on screen: the open island's ring, card or Codex's page, or
+    /// the folded wing with Codex pinned.
+    private func codexLimitsVisibility() -> CodexUsagePoll.Visibility {
+        guard let agents, agents.enabled.contains(.codex) else { return .hidden }
+        if island?.presentation.mode == .expanded {
+            let page = tabs.selected == .sessions && agents.tabAgent == .codex
+            return agents.shownAgent == .codex || page || (agents.cardOpen && agents.isMulti) ? .open : .hidden
+        }
+        return agents.shownAgent == .codex ? .wing : .hidden
+    }
 
     func applicationWillTerminate(_ notification: Notification) {
         inbox.saveNow()
@@ -56,25 +76,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                                 expand: { [weak self] in self?.island?.expandForAlert() },
                                                 peek: { [weak self] in self?.island?.showPeek($0) })
         self.sessions = sessions
+        let registry = registry
+        let agents = AgentsModel(usage: [.claude: sessions.usage, .codex: codex.usage]) { registry.isEnabled($0.integrationId) }
+        self.agents = agents
+        sessions.agentEvent = { [weak self] agent in self?.eventOpens(agent) }
+        codex.limitsVisibility = { [weak self] in self?.codexLimitsVisibility() ?? .hidden }
+        agents.onChange = { [weak self] in self?.codex.pollIfDue() }
         let store = sessions.store
         let nowPlaying = nowPlaying
         let focus = focus
         // Mely out of the notch (task 6.8): the same pose as in the island.
         let desktop = DesktopMelyController(presence: desktopPresence) { model in
             AnyView(WithCharacter(settings: character) {
-                LivePose(sessions: sessions, nowPlaying: nowPlaying, focus: focus) { DesktopMelyFace(model: model, pose: $0) }
+                LivePose(sessions: sessions, agents: agents, nowPlaying: nowPlaying, focus: focus) { DesktopMelyFace(model: model, pose: $0) }
             })
         }
         desktopMely = desktop
         island = IslandWindowController(
             compactLeading: { [nowPlaying, focus] in
                 WithCharacter(settings: character, desktop: desktop) {
-                    LivePose(sessions: sessions, nowPlaying: nowPlaying, focus: focus) { CompactLeading(music: nowPlaying.model, pose: $0, focus: focus.model) }
+                    LivePose(sessions: sessions, agents: agents, nowPlaying: nowPlaying, focus: focus) { CompactLeading(music: nowPlaying.model, pose: $0, focus: focus.model) }
                 }
             },
-            compactTrailing: AnyView(CompactSessionStatus(store: store, usage: sessions.usage, music: nowPlaying.model)),
+            compactTrailing: AnyView(CompactSessionStatus(store: store, usage: sessions.usage, agents: agents, music: nowPlaying.model)),
             expanded: { [chat, notifications, calendar, reminders, nowPlaying, focus, tabs, updateState, inbox, inboxSettings, telemetry, whatsNew] in
-                WithCharacter(settings: character, desktop: desktop) { ExpandedIsland(sessions: sessions, chat: chat, notifications: notifications, calendar: calendar,
+                WithCharacter(settings: character, desktop: desktop) { ExpandedIsland(sessions: sessions, agents: agents, chat: chat, notifications: notifications, calendar: calendar,
                                reminders: reminders, nowPlaying: nowPlaying, focus: focus, whatsNew: whatsNew,
                                tryIt: { [weak self] in self?.tryFocus() }, tabs: tabs, updates: updateState,
                                inbox: inbox, inboxSettings: inboxSettings, count: { telemetry.count($0) },
@@ -84,7 +110,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                }) }
             },
             header: { [chat, notifications, calendar, reminders, nowPlaying, tabs, behavior, updateState, inbox, inboxSettings] in
-                ExpandedHeader(sessions: sessions, chat: chat, notifications: notifications, calendar: calendar, reminders: reminders,
+                ExpandedHeader(sessions: sessions, agents: agents, chat: chat, notifications: notifications, calendar: calendar, reminders: reminders,
                                nowPlaying: nowPlaying,
                                tabs: tabs, behavior: behavior, updates: updateState,
                                inbox: inbox, inboxSettings: inboxSettings,
@@ -95,7 +121,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         island?.wingsPinned = { [weak sessions] in !(sessions?.queue.requests.isEmpty ?? true) }
         island?.wingsLive = { [weak sessions, weak self] in
             guard let sessions else { return false }
-            return IslandWings.live(states: sessions.store.sessions.map(\.state), usage: sessions.usage.usage,
+            return IslandWings.live(states: sessions.store.sessions.map(\.state), usage: agents.shownUsage?.usage,
                                     focus: self?.focus.model.timer)
                 || self?.nowPlaying.model.current?.isPlaying == true
         }
@@ -436,6 +462,7 @@ private struct ExpandedIsland: View {
     }
 
     let sessions: ClaudeSessionsController
+    let agents: AgentsModel
     let chat: ClaudeChatIntegration
     let notifications: NotificationMirrorIntegration
     let calendar: CalendarIntegration
@@ -457,7 +484,7 @@ private struct ExpandedIsland: View {
     var body: some View {
         // Mely big on the left; in the chat it reacts to the answer. A waiting version: «Обновить» under it.
         HStack(alignment: .top, spacing: 12) {
-            LivePose(sessions: sessions, nowPlaying: nowPlaying, focus: focus) { pose in
+            LivePose(sessions: sessions, agents: agents, nowPlaying: nowPlaying, focus: focus) { pose in
                 ChatAwarePose(conversation: tabs.selected == .chat ? chat.conversation : nil,
                               fallback: reminders.celebrating ? TaskCelebration.pose(pose) : pose)
             }
@@ -469,10 +496,14 @@ private struct ExpandedIsland: View {
         // Shown afresh on each opening of the island.
         .onAppear {
             whatsNew.showIfNew(appVersion: AppInfo.version)
+            agents.appeared()
             count(.islandOpened)
             count(.tabOpened(Self.usageTab(tabs.selected)))
         }
-        .onChange(of: tabs.selected) { count(.tabOpened(Self.usageTab(tabs.selected))) }
+        .onChange(of: tabs.selected) {
+            count(.tabOpened(Self.usageTab(tabs.selected)))
+            agents.appeared()
+        }
     }
 
     static func usageTab(_ tab: IslandTabs.Tab) -> UsageCounter.Tab {
@@ -488,7 +519,7 @@ private struct ExpandedIsland: View {
 
     private var content: some View {
         let conversation = chat.conversation
-        return ClaudeOverview(store: sessions.store, queue: sessions.queue, usage: sessions.usage,
+        return ClaudeOverview(store: sessions.store, queue: sessions.queue, usage: sessions.usage, agents: agents,
                        tabs: tabs,
                        chat: conversation.map { c in
                            AnyView(ChatView(conversation: c, preferences: chat.preferences, tabs: tabs,
@@ -595,6 +626,7 @@ extension ExpandedIsland {
 /// sound, settings and «×».
 private struct ExpandedHeader: View {
     let sessions: ClaudeSessionsController
+    let agents: AgentsModel
     let chat: ClaudeChatIntegration
     let notifications: NotificationMirrorIntegration
     let calendar: CalendarIntegration
@@ -609,7 +641,7 @@ private struct ExpandedHeader: View {
     let close: () -> Void
 
     var body: some View {
-        var items = [IslandHeader.Item(.sessions, icon: "house.fill", title: "Claude Code")]
+        var items = [IslandHeader.Item(.sessions, icon: "house.fill", title: "Агенты")]
         if chat.conversation != nil { items.append(.init(.chat, icon: "bubble.left.fill", title: "Чат")) }
         items.append(.init(.today, icon: "calendar", title: "Сегодня"))
         if reminders.status == .running { items.append(.init(.tasks, icon: "checklist", title: "Задачи")) }
@@ -619,7 +651,7 @@ private struct ExpandedHeader: View {
         if NotificationsTab.isShown(notifications: notifications, calendar: calendar, settings: inboxSettings) {
             items.append(.init(.notifications, icon: "bell.fill", title: "Уведомления", badge: inbox.unseen))
         }
-        return IslandHeader(tabs: tabs, items: items, usage: sessions.usage, soundOn: behavior.soundOn,
+        return IslandHeader(tabs: tabs, items: items, usage: sessions.usage, agents: agents, soundOn: behavior.soundOn,
                             heldOpen: !sessions.queue.requests.isEmpty,
                             updateAvailable: updates.hasPendingUpdate,
                             toggleSound: {
@@ -666,6 +698,7 @@ private struct DesktopMelyFace: View {
 /// the pose follows them.
 private struct LivePose<Content: View>: View {
     let sessions: ClaudeSessionsController
+    let agents: AgentsModel
     let nowPlaying: NowPlayingIntegration
     let focus: FocusIntegration
     @ViewBuilder let content: (CharacterPose) -> Content
@@ -678,7 +711,7 @@ private struct LivePose<Content: View>: View {
             pendingApprovals: sessions.queue.requests.filter { !$0.isQuestion }.count,
             pendingQuestions: sessions.queue.requests.filter(\.isQuestion).count,
             musicPlaying: nowPlaying.model.current?.isPlaying == true,
-            planPercent: sessions.usage.usage?.current().fullest?.usedPercent,
+            planPercent: agents.shownUsage?.usage?.current().fullest?.usedPercent,
             focus: focus.status == .running ? focus.model.timer.mood : nil)
         // Re-read every minute: falling asleep depends on time alone.
         TimelineView(.periodic(from: .now, by: 60)) { context in

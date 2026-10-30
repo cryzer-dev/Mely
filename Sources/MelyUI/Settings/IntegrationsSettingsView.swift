@@ -14,14 +14,18 @@ public struct IntegrationsSettingsView: View {
 
     public var body: some View {
         Form {
-            Section {
-                ForEach(registry.visible, id: \.id) { integration in
-                    IntegrationRow(integration: integration,
-                                   isOn: registry.isEnabled(integration.id),
-                                   status: registry.status(of: integration),
-                                   setOn: { on in Task { await registry.setEnabled(integration.id, on) } },
-                                   openPermission: openPermission)
+            if !agents.isEmpty {
+                Section {
+                    ForEach(agents, id: \.id) { row($0) }
+                } header: {
+                    Text("Агенты")
+                } footer: {
+                    Text("С несколькими агентами в челке появится переключатель, а кольцо лимита покажет первого, пока не закрепишь другого.")
+                        .foregroundStyle(.secondary)
                 }
+            }
+            Section {
+                ForEach(others, id: \.id) { row($0) }
             } header: {
                 Text("Интеграции")
             } footer: {
@@ -34,6 +38,23 @@ public struct IntegrationsSettingsView: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    /// The coding agents, in their order: the first is the one shown by default.
+    private var agents: [any Integration] {
+        Agent.allCases.compactMap { agent in registry.visible.first { $0.id == agent.integrationId } }
+    }
+
+    private var others: [any Integration] {
+        registry.visible.filter { Agent(integrationId: $0.id) == nil }
+    }
+
+    private func row(_ integration: any Integration) -> some View {
+        IntegrationRow(integration: integration,
+                       isOn: registry.isEnabled(integration.id),
+                       status: registry.status(of: integration),
+                       setOn: { on in Task { await registry.setEnabled(integration.id, on) } },
+                       openPermission: openPermission)
     }
 }
 

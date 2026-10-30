@@ -23,20 +23,20 @@ public struct LayoutVariant {
 public enum LayoutMatrix {
     public static var all: [LayoutVariant] {
         Fixtures.screens.flatMap { screen -> [LayoutVariant] in
-            let groups: [[LayoutVariant]] = [header(screen), sessions(screen), chat(screen), today(screen), tasks(screen), messages(screen),
+            let groups: [[LayoutVariant]] = [header(screen), sessions(screen), agents(screen), chat(screen), today(screen), tasks(screen), messages(screen),
                                              music(screen), requests(screen), compact(screen), focus(screen), peeks(screen)]
             return groups.flatMap { $0 }
         }
     }
 
     static func expanded(_ name: String, _ screen: Fixtures.Screen, _ tab: IslandTabs.Tab,
-                         usage: Fixtures.Usage = .header, held: Bool = false, showsUsage: Bool = false,
+                         usage: Fixtures.Usage = .header, agents: AgentsModel? = nil, held: Bool = false, showsUsage: Bool = false,
                          updateAvailable: Bool = false, focus: FocusTimer? = nil, then: (@MainActor () -> Void)? = nil,
                          page: @escaping @MainActor () async -> some View) -> LayoutVariant {
         LayoutVariant("\(name)_\(screen.name)", then: then) {
             let content = await page()
             return AnyView(Fixtures.expandedApp(tab, geometry: screen.geometry, held: held, showsUsage: showsUsage,
-                                                usage: Fixtures.usage(usage), updateAvailable: updateAvailable,
+                                                usage: Fixtures.usage(usage), agents: agents, updateAvailable: updateAvailable,
                                                 focus: focus) { content })
         }
     }
@@ -82,6 +82,45 @@ public enum LayoutMatrix {
             },
             expanded("Sessions_NoUsageData", screen, .sessions, usage: .none) {
                 Fixtures.sessionsPage(Fixtures.sessions(2), usage: Fixtures.usage(.none))
+            },
+        ]
+    }
+
+    /// One agent on, as before; two with the switcher, one of them empty, the other one
+    /// asking; the limits card with a block each, Codex pinned; Codex's request.
+    static func agents(_ screen: Fixtures.Screen) -> [LayoutVariant] {
+        [
+            expanded("Agents_One", screen, .sessions, agents: Fixtures.agents([.claude])) {
+                Fixtures.sessionsPage(Fixtures.sessions(2), agents: Fixtures.agents([.claude]))
+            },
+            expanded("Agents_Two", screen, .sessions, agents: Fixtures.agents()) {
+                Fixtures.sessionsPage(Fixtures.agentSessions(), agents: Fixtures.agents())
+            },
+            expanded("Agents_TwoEmpty", screen, .sessions, agents: Fixtures.agents()) {
+                Fixtures.sessionsPage(Fixtures.sessions(2), agents: Fixtures.agents(selected: .codex))
+            },
+            // Under a request, the switcher behind it: the page as it is once the card goes.
+            expanded("Agents_WaitingOther", screen, .sessions, agents: Fixtures.agents()) {
+                let store = Fixtures.agentSessions()
+                let queue = Fixtures.codexWaits(store)
+                return SessionsOverview(store: store, agents: Fixtures.agents(), requests: queue.requests,
+                                        showsHeader: false, open: { _ in })
+            },
+            expanded("Request_Codex", screen, .sessions, agents: Fixtures.agents(), held: true) {
+                Fixtures.requestPage(question: false, agent: .codex, agents: Fixtures.agents())
+            },
+            expanded("Request_ClaudeTwoAgents", screen, .sessions, agents: Fixtures.agents(), held: true) {
+                Fixtures.requestPage(question: false, agents: Fixtures.agents())
+            },
+            expanded("Usage_Card_TwoAgents", screen, .sessions, agents: Fixtures.agents(), showsUsage: true) {
+                Fixtures.sessionsPage(Fixtures.agentSessions(), agents: Fixtures.agents())
+            },
+            expanded("Usage_Card_CodexPinned", screen, .sessions, agents: Fixtures.agents(pinned: .codex, codex: false), showsUsage: true) {
+                Fixtures.sessionsPage(Fixtures.agentSessions(), agents: Fixtures.agents(pinned: .codex, codex: false))
+            },
+            LayoutVariant("Compact_CodexPinned_\(screen.name)") {
+                AnyView(Fixtures.compact(screen.geometry, store: Fixtures.agentSessions(), usage: nil,
+                                         agents: Fixtures.agents(pinned: .codex), music: nil))
             },
         ]
     }

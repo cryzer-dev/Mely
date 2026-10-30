@@ -29,6 +29,26 @@ import Foundation
         #expect(pose(CharacterInputs(sessions: [.idle], lastActivity: noon)) == .idle)
     }
 
+    /// One Mely for every agent: a Claude Code session working and Codex asking for an
+    /// approval make her worried, as a request of Claude's would.
+    @MainActor @Test func everyAgentsSessionsMakeThePose() {
+        let store = SessionStore()
+        let queue = ApprovalQueue()
+        store.apply(.toolStarted(tool: "Edit", input: JSONObject(["file_path": "/w/shop/a.ts"])),
+                    origin: HookOrigin(["session_id": "a", "cwd": "/w/shop"]))
+        let ask: HookEvent = .permissionRequest(tool: "shell", input: JSONObject(["command": ["cargo", "test"]]), suggestions: JSONObject([:]))
+        let codex = store.apply(ask, origin: HookOrigin(["session_id": "a", "cwd": "/w/api", HookWire.agentKey: "codex"]))!
+        var fds: [Int32] = [0, 0]
+        socketpair(AF_UNIX, SOCK_STREAM, 0, &fds)
+        defer { close(fds[0]); close(fds[1]) }
+        queue.enqueue(ask, session: codex, responder: HookResponder(fd: fds[0]))
+        #expect(store.sessions.count == 2)
+        let inputs = CharacterInputs(sessions: store.sessions.map(\.state), lastActivity: at(14),
+                                     pendingApprovals: queue.requests.filter { !$0.isQuestion }.count,
+                                     pendingQuestions: queue.requests.filter(\.isQuestion).count)
+        #expect(pose(inputs) == .worried)
+    }
+
     @Test func focusOutranksWorkButNotWhatNeedsTheUser() {
         let noon = at(14)
         // Focus and Claude working: focused; a permission or a question: as without the focus.
