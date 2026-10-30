@@ -37,7 +37,7 @@ public struct GreetingView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Привет! Я Mely")
                         .font(.system(size: MelyType.display, weight: .bold, design: .rounded))
-                    Text("Живу в челке и присматриваю за Claude")
+                    Text("Живу в челке и присматриваю за твоими агентами")
                         .font(.system(size: MelyType.body))
                         .foregroundStyle(.white.opacity(MelyInk.secondary))
                 }

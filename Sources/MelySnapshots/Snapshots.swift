@@ -21,6 +21,7 @@ enum Snapshots {
             Snapshot(name: "icon", view: AnyView(MelyAppIcon().frame(width: 160, height: 160))),
             Snapshot(name: "hero", view: AnyView(Desk { sessionsOverview() })),
             Snapshot(name: "approval", view: AnyView(Desk { requestCard(question: false) })),
+            Snapshot(name: "agents", view: AnyView(Desk { agentsTab() })),
             Snapshot(name: "chat", view: AnyView(Desk { chat(hasKey: true, answer: readmeAnswer) })),
             Snapshot(name: "today", view: AnyView(Desk { calendarAgenda() })),
             Snapshot(name: "tasks", view: AnyView(Desk { tasksTab() })),
@@ -865,6 +866,19 @@ enum Snapshots {
         queue.enqueue(second, session: store.apply(second, origin: admin)!, responder: SampleResponder.make())
         return expandedApp(.sessions, held: true, pose: question ? .curious : .worried) {
             ClaudeOverview(store: store, queue: queue, open: { _ in }, decide: { _, _ in }, answerInTerminal: { _ in })
+        }
+    }
+
+    /// Claude Code and Codex on: Codex's page in the switcher, its limits pinned in the notch.
+    @MainActor private static func agentsTab() -> some View {
+        let store = Fixtures.sessions(2)
+        for (id, name, file) in [("x1", "api", "src/orders.rs"), ("x2", "infra", "deploy/main.tf")] {
+            store.apply(.toolStarted(tool: "apply_patch", input: JSONObject(["input": "*** Begin Patch\n*** Update File: \(file)\n"])),
+                        origin: Fixtures.codexOrigin(id, "/w/\(name)"))
+        }
+        let agents = Fixtures.agents(pinned: .codex, selected: .codex)
+        return Fixtures.expandedApp(.sessions, pose: .working, agents: agents, backdrop: .clear) {
+            Fixtures.sessionsPage(store, agents: agents)
         }
     }
 
