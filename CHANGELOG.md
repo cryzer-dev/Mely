@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.8.0](https://github.com/cryzer-dev/Mely/compare/v1.7.0...v1.8.0) (2026-10-30)
+
+
+### Новое
+
+* **Codex:** Агент в событиях и сессиях, шаги и разрешения Codex ([9c9f5eb](https://github.com/cryzer-dev/Mely/commit/9c9f5ebec1dbdc26a17503294dbd3ac69949e5ac))
+* **Codex:** Карточка «Что нового в Mely 1.8» с подключением Codex ([23aaafd](https://github.com/cryzer-dev/Mely/commit/23aaafdf76fe2cac9046544c7484227de0e4b2a3))
+* **Codex:** Лимиты Codex из app-server и хранилище лимитов по агентам ([1002364](https://github.com/cryzer-dev/Mely/commit/100236427ca0418c5bd370f61e42158ddeff0bb9))
+* **Codex:** Раздел «Агенты», переключатель агентов, метки запросов и закрепление лимита в челке ([ee1ad12](https://github.com/cryzer-dev/Mely/commit/ee1ad12be909a29cff783189b371cfcf0ebc09e9))
+* **Codex:** Установка и одобрение hooks Codex, общий сокет для агентов ([9267056](https://github.com/cryzer-dev/Mely/commit/9267056bc01356338c8ab2914e8aca741153f252))
+
 ## [1.7.0](https://github.com/cryzer-dev/Mely/compare/v1.6.0...v1.7.0) (2026-10-29)
 
 
