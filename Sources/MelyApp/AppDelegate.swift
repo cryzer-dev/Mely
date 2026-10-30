@@ -102,7 +102,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             expanded: { [chat, notifications, calendar, reminders, nowPlaying, focus, tabs, updateState, inbox, inboxSettings, telemetry, whatsNew] in
                 WithCharacter(settings: character, desktop: desktop) { ExpandedIsland(sessions: sessions, agents: agents, chat: chat, notifications: notifications, calendar: calendar,
                                reminders: reminders, nowPlaying: nowPlaying, focus: focus, whatsNew: whatsNew,
-                               tryIt: { [weak self] in self?.tryFocus() }, tabs: tabs, updates: updateState,
+                               tryIt: { [weak self] in self?.tryCodex() }, tabs: tabs, updates: updateState,
                                inbox: inbox, inboxSettings: inboxSettings, count: { telemetry.count($0) },
                                enableCalendar: { [weak self] in
                                    guard let self else { return }
@@ -268,13 +268,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     static let updatePeekPrefix = "update-available-"
     static let updatedPeekPrefix = "updated-"
 
-    /// «Попробовать фокус»: on (no permission to ask), then «Сегодня» with «Фокус» on top.
-    private func tryFocus() {
+    /// «Подключить Codex»: switched on (it offers its hooks' diff by itself) and the
+    /// «Агенты» section of the settings, where its status and buttons are.
+    private func tryCodex() {
         whatsNew.dismiss()
         Task { [weak self] in
             guard let self else { return }
-            if !self.registry.isEnabled(self.focus.id) { await self.registry.setEnabled(self.focus.id, true) }
-            if self.focus.status == .running { self.tabs.selected = .today } else { self.openSettings(on: .integrations) }
+            self.openSettings(on: .integrations)
+            if !self.registry.isEnabled(self.codex.id) { await self.registry.setEnabled(self.codex.id, true) }
         }
     }
 

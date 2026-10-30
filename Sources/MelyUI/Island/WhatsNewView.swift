@@ -72,6 +72,7 @@ public struct WhatsNewView: View {
         switch card.accent {
         case .working: MelyTint.working
         case .focus: MelyTint.focus
+        case .codex: AgentStyle.color(.codex)
         }
     }
 

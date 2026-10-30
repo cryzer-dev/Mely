@@ -11,21 +11,21 @@ import Foundation
 
     @Test func versions() {
         let card = WhatsNew.current
-        #expect(card.matches("1.7") && card.matches("1.7.0") && card.matches("1.7.12"))
-        #expect(!card.matches("1.70.0") && !card.matches("1.6.0") && !card.matches("1.6.0-dev") && !card.matches(""))
+        #expect(card.matches("1.8") && card.matches("1.8.0") && card.matches("1.8.12"))
+        #expect(!card.matches("1.80.0") && !card.matches("1.7.0") && !card.matches("1.6.0-dev") && !card.matches(""))
     }
 
     @Test func onceAfterTheUpdate() throws {
         let (whatsNew, defaults) = try state()
-        whatsNew.showIfNew(appVersion: "1.7.0")
+        whatsNew.showIfNew(appVersion: "1.8.0")
         #expect(whatsNew.isShowing)
         whatsNew.dismiss()
         #expect(!whatsNew.isShowing)
         // Next opening, a restart, a patch release: not again.
-        whatsNew.showIfNew(appVersion: "1.7.0")
+        whatsNew.showIfNew(appVersion: "1.8.0")
         #expect(!whatsNew.isShowing)
         let again = WhatsNewState(defaults: defaults)
-        again.showIfNew(appVersion: "1.7.1")
+        again.showIfNew(appVersion: "1.8.1")
         #expect(!again.isShowing)
         // «Что нового» on the preview still opens it.
         again.show()
